@@ -1,0 +1,13 @@
+#!/bin/sh
+# 快捷指令：启动 Ds v0.1 交互终端（REPL）
+# 用法： 启动ds            进入 REPL
+#        启动ds 文件.ds    运行脚本
+if command -v ds >/dev/null 2>&1; then
+    DS_BIN=ds
+else
+    DS_BIN="python3 -m dsv01"
+fi
+if [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; then
+    exec $DS_BIN "$@"
+fi
+exec $DS_BIN --repl "$@"

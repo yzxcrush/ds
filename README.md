@@ -91,6 +91,22 @@ chmod +x hello.ds && ./hello.ds
 
 Termux 的 shebang 用上面的绝对路径（本机没有 `/usr/bin/env`）；Linux/macOS 写 `#!/usr/bin/env ds` 即可。首行 `#` 在 Ds 里是注释，因此 shebang 不参与词法。
 
+### 快捷指令
+
+| 命令 | 作用 |
+|---|---|
+| `启动ds` | 进入 Ds v0.1 交互终端（REPL） |
+| `启动ds 文件.ds` | 直接运行脚本（等价 `ds 文件.ds`） |
+| `dsrepl` | 英文别名，同样进入 REPL |
+
+一键安装（驱动 + 快捷指令 + 命令）：
+
+```bash
+cd ~/1/ds-v0.1 && ./install.sh
+```
+
+`install.sh` 会 `pip install --force-reinstall .` 并把 `bin/启动ds`、`bin/dsrepl` 复制到 `$PREFIX/bin`。
+
 ### 驱动选项
 
 | 选项 | 行为 |
