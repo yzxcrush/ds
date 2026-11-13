@@ -201,6 +201,7 @@ class Interpreter:
     def run_file(self, path: str, *, run_main: bool = True) -> Any:
         from .parser import parse_program
 
+        path = _expand(path)
         with open(path, "r", encoding="utf-8") as fh:
             src = fh.read()
         program = parse_program(src, path)
@@ -1730,6 +1731,12 @@ def _pad(offset: int, align: int) -> int:
     if align <= 1:
         return offset
     return (offset + align - 1) // align * align
+
+
+def _expand(path: str) -> str:
+    import os
+
+    return os.path.expanduser(path)
 
 
 def _dirname(path: str) -> str:

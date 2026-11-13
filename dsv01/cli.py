@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from . import __version__
 from . import builtins as bi
@@ -83,8 +84,14 @@ def _resolve_config(args) -> dict:
     }
 
 
+def _prog() -> str:
+    """终端里显示的命令名（ds、dscc、启动ds 等）。"""
+    name = os.path.basename(sys.argv[0] or "")
+    return name if name else "ds"
+
+
 def _usage(msg: str) -> int:
-    print(f"dscc: error: {msg}", file=sys.stderr)
+    print(f"{_prog()}: error: {msg}", file=sys.stderr)
     return EXIT_USAGE
 
 
@@ -105,18 +112,23 @@ def _make_interp(cfg: dict, *, stdout=None) -> Interpreter:
 def _read_source(args) -> tuple[str, str]:
     if args.code is not None:
         return args.code, "<code>"
+    path = os.path.expanduser(args.input)
     try:
-        with open(args.input, "r", encoding="utf-8") as fh:
-            return fh.read(), args.input
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read(), path
     except FileNotFoundError:
-        print(f"dscc: error: 找不到源文件：{args.input}", file=sys.stderr)
+        print(f"{_prog()}: error: 找不到源文件：{args.input}", file=sys.stderr)
         raise SystemExit(EXIT_ERROR)
     except OSError as exc:
-        print(f"dscc: error: 读取失败：{exc}", file=sys.stderr)
+        print(f"{_prog()}: error: 读取失败：{exc}", file=sys.stderr)
         raise SystemExit(EXIT_ERROR)
 
 
 def _report(exc: BaseException) -> int:
+    if isinstance(exc, OSError):
+        where = getattr(exc, "filename", None) or ""
+        print(f"error: 无法读取文件：{where or exc}", file=sys.stderr)
+        return EXIT_ERROR
     if isinstance(exc, DsSyntaxError):
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR
@@ -223,7 +235,7 @@ def _repl(args, cfg: dict) -> int:
                 print(f"Ds v{__version__}")
                 continue
             if stripped.startswith(":load "):
-                path = stripped[len(":load "):].strip()
+                path = os.path.expanduser(stripped[len(":load "):].strip())
                 try:
                     interp.run_file(path)
                 except BaseException as exc:  # noqa: BLE001
