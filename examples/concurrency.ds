@@ -1,0 +1,67 @@
+# Ds v0.1 并发示例（应用模式，--rt full）
+#
+# 覆盖：spawn / go / thread / chan / send / recv / mutex / wait
+#       opt 结果匹配、结构化并发作用域、块表达式、通道关闭
+
+package concurrency
+
+fn worker(ch: chan[i32], id: i32) {
+    send ch, id
+}
+
+fn compute() -> i32 {
+    42
+}
+
+fn realtime_loop() {
+    var n = 0
+    while n < 3 {
+        n = n + 1
+    }
+}
+
+fn main() {
+    # 有界通道 + 分离式任务（go 不登记作用域，须自行同步）
+    let ch = chan[i32](8)
+    for i in [1 2 3] {
+        go worker(ch, i)
+    }
+
+    var sum = 0
+    for _ in [0 1 2] {
+        match recv ch {
+            some(v) => sum = sum + v,
+            none => break,
+        }
+    }
+    _ = sum
+
+    # 结构化并发：离开块时自动 wait，任务 panic 转为 err
+    {
+        let t = spawn { compute() }
+        match wait t {
+            ok(v) => println("task ok"),
+            err(e) => println("task failed"),
+        }
+    }
+
+    # 共享可变状态只能经 mutex；守卫离开作用域自动解锁
+    let m = mutex(0)
+    {
+        let guard = m.lock()
+        _ = guard
+    }
+
+    # 独占 OS 线程
+    let t2 = thread(realtime_loop)
+    wait t2
+
+    # 无缓冲通道：同步交接；关闭后 recv 得 none
+    let ch2 = chan[i32]()
+    send ch2, 7
+    match recv ch2 {
+        some(v) => println("got value"),
+        none => println("closed"),
+    }
+    ch2.close()
+}

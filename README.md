@@ -1,0 +1,104 @@
+# Ds v0.1 — 新编程语言定义（全量关键词表）
+
+> **定义稿（Definition-only）**：本仓库给出 Ds v0.1 的完整定位、词法、**77 项全量关键词表**、运算符、字面量、注释、EBNF 骨架、语义契约与 `dscc` 编译驱动定义。**不含编译器实现**，示例只保证词法可接受。
+
+## 一键校验
+
+```bash
+cd ds-v0.1
+python3 tools/ds_keywords.py build                     # 从规范文档生成 spec/keywords.json
+python3 tools/ds_keywords.py check --json spec/keywords.json   # 覆盖/重复/类别/计数校验
+python3 tools/dslex.py                                # 词法自检 + 示例扫描
+```
+
+实测结果：
+
+```
+✓ 关键词覆盖：11/11 类，合计 77（标识符 73 + 符号 4）
+✓ 运算符：26 个全部在表
+✓ dscc：位置参数 + 7 个核心选项全部在表
+✓ 字面量 9 种、注释 4 种全部在文
+✓ 词法自检：20/20 通过（关键字 77、字面量 9、注释 4 类、错误路径）
+✓ 示例词法检查通过（4 个文件，1010 + 410 + 303 + 299 个记号）
+✓ 示例关键词覆盖：77/77
+```
+
+## 交付物
+
+| 文件 | 内容 |
+|---|---|
+| [spec/DS-v0.1.md](spec/DS-v0.1.md) | 规范主文档（定位/词法/关键词语义表/运算符优先级/字面量/注释/EBNF/语义契约/dscc） |
+| [spec/keywords.json](spec/keywords.json) | 机器可读索引：77 项关键词的形式、语义、示例，含字母序索引 |
+| [tools/ds_keywords.py](tools/ds_keywords.py) | 关键词表校验器 + 索引生成器（与文档双向一致性） |
+| [tools/dslex.py](tools/dslex.py) | 参考词法器：可执行的词法定义 + 自检 + 示例扫描 |
+| [examples/tour.ds](examples/tour.ds) | 应用模式综合示例（覆盖 77 个关键字的大部分语法形态） |
+| [examples/concurrency.ds](examples/concurrency.ds) | 并发：`spawn`/`go`/`thread`/`chan`/`send`/`recv`/`mutex`/`wait` |
+| [examples/memory.ds](examples/memory.ds) | 内存：`alloc`/`free`/`rc`/`arc`/`ref`/`ptr`/`raw`/`gc`/`volatile` |
+| [examples/bare.ds](examples/bare.ds) | 裸机：`section`/`at`/`irq`/`asm`/`packed`/`static mut`/`@unsafe` |
+
+## 全量关键词表（77 项速查）
+
+| 类别 | 数 | 关键词 |
+|---|---|---|
+| 定义 | 9 | `fn` `let` `var` `type` `class` `trait` `impl` `mod` `package` |
+| 控制 | 9 | `if` `else` `loop` `while` `for` `break` `continue` `return` `goto` |
+| 管道 | 3 | `->` `=>` `\|>` |
+| 错误 | 7 | `try` `catch` `panic` `recover` `assert` `res` `opt` |
+| 模块 | 8 | `use` `as` `export` `pub` `priv` `prot` `static` `extern` |
+| 并发 | 8 | `spawn` `go` `thread` `chan` `send` `recv` `mutex` `wait` |
+| 内存 | 9 | `raw` `free` `alloc` `rc` `arc` `gc` `ptr` `ref` `mut` |
+| 裸机 | 7 | `@` `asm` `volatile` `at` `irq` `section` `packed` |
+| 元编程 | 4 | `comptime` `macro` `typeinfo` `attr` |
+| OOP | 6 | `self` `super` `new` `drop` `extends` `dyn` |
+| 模式 | 7 | `match` `when` `where` `in` `is` `sizeof` `alignof` |
+| **合计** | **77** | **73 个标识符式 + 4 个符号式（`@` `->` `=>` `\|>`）** |
+
+每个词的形式、语义、示例见 [spec/DS-v0.1.md` §1.3](spec/DS-v0.1.md)。
+
+## 关键设计决策（消歧摘要）
+
+1. **硬关键字冻结**：77 项全部为硬关键字，不可作标识符；对齐外部符号用反引号原始标识符 `` `free` ``。
+2. **`{}` 是块，`{k:v}` 是映射**：空块 `{}`、空映射 `{:}`；因此 **0.1 不设结构体字面量**——值类型用 `名(字段: 值)` 构造，类用 `类.new(...)` 构造。
+3. **泛型用 `[]`**：`Vec[T]`、`res[T, E]`、`[]u8`，避免 `<>` 与比较运算符冲突。
+4. **三个箭头分工**：`->` 管类型（返回类型/函数类型），`=>` 管值（match 分支/单表达式函数体/匿名函数），`|>` 是表达式管道（左结合降糖）。
+5. **错误三层**：`res`/`opt` + `try`/`catch` 处理可恢复错误；`panic`/`recover` 处理不可恢复错误；`assert` 只用于不变量。
+6. **内存四选一**：栈/静态、`alloc`+`free`、`rc`/`arc`、`gc`；`ref` 是受检借用，`ptr`/`raw` 是只能在 `@unsafe` 中解引用的逃逸口。
+7. **并发**：`spawn` 结构化（作用域结束自动 `wait`）、`go` 分离（须自同步）、`thread` 独占 OS 线程；共享可变状态只能经 `mutex`/`chan`。
+8. **裸机**：`@` 属性前缀 + `asm`/`volatile`/`at`/`irq`/`section`/`packed`，配合 `@unsafe { }` 不安全块；`--bare` 下禁用 GC 与隐式分配。
+9. **元编程四阶段**：`macro`（解析期语法）、`comptime`（编译期求值）、`typeinfo`（类型反射）、`attr`（自定义属性）。
+10. **OOP**：`class` 单继承 + `extends`/`super` + `trait`/`impl`/`dyn`；确定性 `drop`。
+11. **注释三种**：`#` 行、`//` 行、`#| ... |#` 可嵌套块；紧邻声明的块注释约定为文档注释。
+12. **编译驱动**：`dscc input.ds -o out --app/--bare --target --opt --gc --rt`，模式互斥、默认矩阵与退出码见规范 §7。
+
+## `dscc` 核心选项速查
+
+| 选项 | 取值 | 默认 |
+|---|---|---|
+| `-o <path>` | 输出路径 | `a.out`（app）/ `<package>.elf`（bare） |
+| `--app` | 应用模式 | 默认（与 `--bare` 互斥） |
+| `--bare` | 裸机 no_std 模式 | 与 `--app` 二选一 |
+| `--target <triple>` | 7 个 0.1 支持目标 | 宿主 |
+| `--opt <0\|1\|2\|3\|s\|z>` | 优化级别 | `2` |
+| `--gc <none\|rc\|arc\|tracing>` | GC 策略 | app: `tracing`；bare: `none` |
+| `--rt <none\|minimal\|full>` | 运行时 | app: `full`；bare: `minimal` |
+
+## 发布到 GitHub
+
+仓库已配置好 SSH(443) + Deploy Key 的发布脚本，默认目标 `yzxcrush/ds-v0.1`：
+
+```bash
+bash tools/publish.sh                 # 推送到 yzxcrush/ds-v0.1
+bash tools/publish.sh owner/repo      # 或指定其他仓库
+```
+
+前置条件（只需做一次）：
+
+1. <https://github.com/new> 新建空仓库 `ds-v0.1`（**不要**初始化 README/License）；
+2. 仓库 Settings → Deploy keys → 添加 `~/.ssh/ds_github.pub` 的内容并勾选 **Allow write access**；
+3. 运行上面的脚本。`tools/publish.sh` 会先自检 key 与仓库可达性，失败时给出明确修复提示。
+
+## 边界说明
+
+- 本仓库是**语言定义**，不是实现：没有可执行编译器，示例仅通过参考词法器校验，不代表能通过语法/类型检查。
+- 规范中的示例构造（`math.sqrt`、`println` 等）来自 prelude/std，prelude 清单见规范 §1.4。
+- 未来（0.2）可能升格为关键字的候选词：`struct` `enum` `const` `defer` `async` `await`；在 0.1 中它们仍是合法标识符。

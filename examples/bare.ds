@@ -1,0 +1,69 @@
+# Ds v0.1 裸机示例
+#
+# 编译： dscc bare.ds -o firmware.elf --bare \
+#            --target thumbv7em-none-eabi --opt z --gc none --rt minimal
+#
+# 覆盖：section / at / irq / asm / volatile / packed / static mut
+#       @entry / @unsafe / ptr / raw / goto / loop / sizeof / alignof
+# 注意：裸机模式无 OS、无 GC、无隐式分配；ISR 内禁止阻塞原语。
+
+package firmware
+
+section ".boot" {
+    @entry
+    fn reset_handler() at 0x0000_0000 {
+        init()
+        loop {
+            @unsafe { asm "wfi" }
+        }
+    }
+}
+
+static mut TICKS: u32 = 0
+
+packed type FrameHeader {
+    magic: u16,
+    len: u32,
+}
+
+@irq(5)
+irq fn timer_tick() {
+    @unsafe {
+        TICKS = TICKS + 1
+    }
+}
+
+fn read_reg(addr: usize) -> u32 {
+    @unsafe {
+        let p = addr as volatile ptr[u32]
+        *p
+    }
+}
+
+@unsafe
+fn write_reg(addr: usize, value: u32) {
+    let p = addr as volatile ptr[u32]
+    *p = value
+}
+
+fn init() {
+    write_reg(0x4000_0000, 1)
+}
+
+fn delay(limit: u32) -> u32 {
+    var n: u32 = 0
+again:
+    n = n + 1
+    if n < limit { goto again }
+    n
+}
+
+fn main() {
+    let h = FrameHeader(magic: 0x5A5A as u16, len: 8 as u32)
+    let size = sizeof(FrameHeader)
+    let align = alignof(FrameHeader)
+    _ = h
+    _ = size
+    _ = align
+    _ = delay(10)
+}

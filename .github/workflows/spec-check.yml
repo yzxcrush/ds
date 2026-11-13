@@ -1,0 +1,19 @@
+name: spec-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 关键词表 / 运算符 / dscc 覆盖校验
+        run: python3 tools/ds_keywords.py check --json spec/keywords.json
+      - name: 词法自检 + 示例扫描
+        run: python3 tools/dslex.py

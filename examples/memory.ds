@@ -1,0 +1,80 @@
+# Ds v0.1 内存示例（应用模式）
+#
+# 覆盖：alloc / free / rc / arc / ref / mut / ptr / raw / gc / volatile / @unsafe
+#       drop 确定性析构、ptr 解引用与算术、借用绑定
+
+package memory
+
+type Buffer {
+    data: ptr[u8],
+    len: usize,
+}
+
+impl Buffer {
+    fn new(len: usize) -> Buffer {
+        Buffer(data: alloc(len, alignof(u8)), len: len)
+    }
+
+    fn get(ref self, i: usize) -> opt[u8] {
+        if i >= self.len {
+            return none
+        }
+        @unsafe { some(*(self.data + i)) }
+    }
+
+    drop(self) {
+        free(self.data)
+    }
+}
+
+type Node {
+    next: opt[rc[Node]],
+}
+
+fn main() {
+    # 裸块分配 + 自定义 drop：离开作用域自动 free
+    let b = Buffer.new(16)
+    match b.get(0) {
+        some(v) => println("byte read"),
+        none => println("out of bounds"),
+    }
+
+    # 引用计数：最后一份释放时触发 Buffer.drop
+    let shared = rc(Buffer.new(4))
+    let alias = shared.clone()
+
+    # 原子引用计数 + mutex：可跨线程
+    let thread_safe = arc(mutex(0))
+
+    # 借用绑定（类型站点自动借用，非拥有）
+    let base = Buffer.new(8)
+    let borrowed: ref Buffer = base
+    let mutable: ref mut Buffer = base
+
+    # 裸指针与 raw：绕过借用检查
+    let address: raw = base.data as raw
+    @unsafe {
+        let p: ptr[u32] = 0x4000_0000 as ptr[u32]
+        let first = *p
+        let second = *(p + 1)
+        _ = first
+        _ = second
+    }
+
+    # MMIO：易失访问不可被优化
+    let reg: volatile ptr[u32] = 0x4000_0000 as volatile ptr[u32]
+    @unsafe {
+        let status = *reg
+        _ = status
+    }
+
+    # GC 托管对象：仅 --gc != none 可用
+    let node = gc(Node(next: none))
+
+    _ = alias
+    _ = thread_safe
+    _ = borrowed
+    _ = mutable
+    _ = address
+    _ = node
+}

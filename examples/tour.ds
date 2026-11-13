@@ -1,0 +1,194 @@
+# Ds v0.1 综合示例（应用模式）
+#
+# 覆盖：package / mod / use / export / pub / priv / prot
+#       type / class / trait / impl / extends / super / new / drop / dyn
+#       let / var / if / else / match / when / for / while / loop
+#       break / continue / return / goto
+#       res / opt / try / catch / panic / assert
+#       |> / sizeof / alignof / comptime / macro / typeinfo / attr
+#       in / is / ref / mut
+#
+# 说明：示例用于展示语法形态，尚未经编译器验证，不构成规范。
+
+package tour
+
+mod geometry {
+    pub type Vec2 {
+        x: f32,
+        y: f32,
+    }
+
+    pub fn length(v: ref Vec2) -> f32 {
+        let dx = v.x
+        let dy = v.y
+        math.sqrt(dx * dx + dy * dy)
+    }
+}
+
+use geometry.{Vec2, length}
+
+export geometry.Vec2
+
+trait Draw {
+    fn draw(ref self) -> str
+}
+
+impl Draw for Vec2 {
+    fn draw(ref self) -> str {
+        "vec2"
+    }
+}
+
+impl Vec2 {
+    fn scale(mut self, k: f32) {
+        self.x = self.x * k
+        self.y = self.y * k
+    }
+}
+
+class Shape {
+    name: str
+
+    fn new(name: str) {
+        self.name = name
+    }
+
+    fn describe(ref self) -> str {
+        self.name
+    }
+}
+
+class Circle extends Shape {
+    radius: f32
+
+    fn new(radius: f32) {
+        super.init("circle")
+        self.radius = radius
+    }
+
+    drop(self) {
+        println("drop " + self.name)
+    }
+}
+
+fn checked_div(a: i32, b: i32) -> res[i32, error] {
+    if b == 0 {
+        return err(error("division by zero"))
+    }
+    ok(a / b)
+}
+
+fn ratio(a: i32, b: i32) -> res[i32, error] {
+    let v = try checked_div(a, b)
+    ok(v + 1)
+}
+
+fn parse_opt(o: opt[i32]) -> i32 {
+    match o {
+        some(v) when v > 0 => v,
+        some(_) => 0,
+        none => -1,
+    }
+}
+
+macro unless(c: expr, b: block) {
+    if !c b
+}
+
+attr doc(target: fn) {
+    text: str
+}
+
+fn spin(limit: u32) -> u32 {
+    var n: u32 = 0
+retry:
+    n = n + 1
+    if n < limit { goto retry }
+    n
+}
+
+priv fn helper() { }
+
+prot fn internal() { }
+
+extern "C" fn host_log(s: str) -> i32
+
+fn show[T](x: T) -> str where T: Draw {
+    x.draw()
+}
+
+fn boom() {
+    try {
+        panic "boom"
+    } catch panic {
+        let payload = recover
+        _ = payload
+    }
+}
+
+@doc(text: "Ds v0.1 demonstration")
+fn main() {
+    var total = 0
+    for v in [1 2 3 4 5] {
+        if v == 4 { continue }
+        total = total + v
+    }
+
+    var i = 0
+    loop {
+        i = i + 1
+        if i >= 3 { break }
+    }
+    while i > 0 {
+        i = i - 1
+    }
+
+    let p = Vec2(x: 3.0, y: 4.0)
+    let len = length(p) |> math.round
+    println(p.draw())
+
+    let c = Circle.new(2.0)
+    println(c.describe())
+
+    let d: rc[dyn Draw] = rc(Vec2(x: 1.0, y: 2.0)) as rc[dyn Draw]
+    println(d.draw())
+
+    if "x" in ["x" "y"] {
+        println("contains")
+    }
+    if total is i32 {
+        println("signed total")
+    }
+    if total > 0 {
+        println("positive")
+    } else {
+        println("non-positive")
+    }
+
+    assert parse_opt(none) == -1, "none maps to -1"
+    assert parse_opt(some(5)) == 5, "some maps to itself"
+
+    match ratio(8, 2) {
+        ok(v) => println("ratio ok"),
+        err(e) => println("ratio failed"),
+    }
+    match ratio(8, 0) {
+        ok(_) => println("unreachable"),
+        err(e) => println("caught: " + e.message),
+    }
+
+    comptime {
+        assert sizeof(Vec2) >= 8, "Vec2 too small"
+        assert alignof(Vec2) <= 8, "Vec2 over-aligned"
+    }
+    let info = comptime typeinfo(Vec2)
+    println(info.name)
+    println(show(p))
+    helper()
+    internal()
+    boom()
+
+    unless(false, { println("unless fires") })
+
+    _ = spin(1)
+}
