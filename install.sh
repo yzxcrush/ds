@@ -3,7 +3,7 @@
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$here"
-pip install --force-reinstall .
+pip install --force-reinstall --no-cache-dir .
 prefix=${PREFIX:-/usr/local}
 mkdir -p "$prefix/bin"
 cp bin/启动ds bin/dsrepl "$prefix/bin/"

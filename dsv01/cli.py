@@ -201,25 +201,67 @@ REPL_HELP = """\
 直接输入 Ds 代码回车执行；未闭合的块/括号会自动续行，空行结束。"""
 
 
+def _readline_from(stream, prompt: str) -> str:
+    if prompt:
+        if stream is sys.stdin:
+            print(prompt, end="", flush=True)   # stdin 只读，提示符走 stdout
+        else:
+            try:
+                stream.write(prompt)
+                stream.flush()
+            except (OSError, ValueError):
+                pass
+    line = stream.readline()
+    if line == "":
+        raise EOFError
+    return line.rstrip("\n")
+
+
 def _repl(args, cfg: dict) -> int:
     from .parser import parse_repl
 
     interp = _make_interp(cfg)
     if not args.quiet:
-        print(f"Ds v{__version__} REPL（参考驱动；:help 查看命令，Ctrl-D 退出）")
-    interactive = sys.stdin.isatty()
+        print(f"Ds v{__version__} 编译器 · 交互终端（:help 查看命令，Ctrl-D 退出）")
+
+    stream = sys.stdin
+    interactive = stream.isatty()
+    if not interactive:
+        tty = None
+        for mode in ("r+", "r"):
+            try:
+                tty = open("/dev/tty", mode, encoding="utf-8", errors="replace")
+                break
+            except OSError:
+                tty = None
+        if tty is not None:
+            stream = tty
+            interactive = True
+
+    had_input = False
     buffer = ""
     while True:
         prompt = (("ds> " if not buffer else "... ") if interactive else "")
         try:
-            line = input(prompt)
+            line = _readline_from(stream, prompt) if interactive else input("")
         except EOFError:
-            print()
+            if not had_input and not interactive:
+                print(
+                    f"Ds v{__version__} 编译器：当前 stdin 不是交互式终端，无法进入会话。\n"
+                    "  · 在终端里直接运行：  启动ds\n"
+                    "  · 运行脚本：          启动ds 文件.ds\n"
+                    "  · 执行一段代码：      启动ds -c 'package t\nfn main() { println(\"hi\") }'",
+                    file=sys.stderr,
+                )
+                return EXIT_USAGE
+            if interactive:
+                print()
             return EXIT_OK
         except KeyboardInterrupt:
             print("\n(中断；已清空输入)")
             buffer = ""
             continue
+        had_input = True
         stripped = line.strip()
         if not buffer and stripped.startswith(":"):
             if stripped in (":q", ":quit", ":exit"):

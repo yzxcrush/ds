@@ -1,7 +1,7 @@
 #!/bin/sh
-# 快捷指令：启动 Ds v0.1 交互终端（REPL）
-# 用法： 启动ds            进入 REPL
-#        启动ds 文件.ds    运行脚本
+# 快捷指令：在终端启动 Ds v0.1 编译器（交互会话）
+#   启动ds            进入交互编译器会话
+#   启动ds 文件.ds    编译并运行脚本
 if command -v ds >/dev/null 2>&1; then
     DS_BIN=ds
 else
@@ -9,5 +9,8 @@ else
 fi
 if [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; then
     exec $DS_BIN "$@"
+fi
+if [ ! -t 0 ] && ( : < /dev/tty ) 2>/dev/null; then
+    exec $DS_BIN --repl "$@" < /dev/tty
 fi
 exec $DS_BIN --repl "$@"
