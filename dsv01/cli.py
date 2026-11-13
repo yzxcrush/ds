@@ -287,7 +287,19 @@ def _looks_incomplete(text: str) -> bool:
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
+
+def _init_stdio() -> None:
+    """管道被下游关闭时静默退出（python ... | head 场景）。"""
+    try:
+        import signal
+
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except (ImportError, AttributeError, ValueError):
+        pass
+
+
 def main_dscc(argv: list[str] | None = None) -> int:
+    _init_stdio()
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = _build_parser("dscc", require_input=True)
     args = parser.parse_args(argv)
@@ -301,6 +313,7 @@ def main_dscc(argv: list[str] | None = None) -> int:
 
 
 def main_ds(argv: list[str] | None = None) -> int:
+    _init_stdio()
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = _build_parser("ds", require_input=False)
     args = parser.parse_args(argv)

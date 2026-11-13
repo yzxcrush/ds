@@ -57,6 +57,40 @@ python3 -m dsv01                       # 模块方式 REPL
 
 也可以安装成命令（`pip install -e .` → `dscc`、`ds` 全局可用）。
 
+### 安装到终端（本机已完成）
+
+本机已通过 pip 安装为全局命令（`$PREFIX/bin/ds`、`$PREFIX/bin/dscc`），任意目录可直接用：
+
+```bash
+ds --version                    # ds (Ds v0.1.0)
+ds ~/1/ds-v0.1/examples/tour.ds
+dscc ~/1/ds-v0.1/examples/concurrency.ds
+```
+
+源码更新后重装 / 卸载：
+
+```bash
+cd ~/1/ds-v0.1 && pip install --force-reinstall .
+pip uninstall dsv01
+```
+
+### 可执行脚本（像 `.py` 一样直接运行）
+
+```ds
+#!/data/data/com.termux/files/usr/bin/ds
+package hello
+
+fn main() {
+    println("hi")
+}
+```
+
+```bash
+chmod +x hello.ds && ./hello.ds
+```
+
+Termux 的 shebang 用上面的绝对路径（本机没有 `/usr/bin/env`）；Linux/macOS 写 `#!/usr/bin/env ds` 即可。首行 `#` 在 Ds 里是注释，因此 shebang 不参与词法。
+
 ### 驱动选项
 
 | 选项 | 行为 |
