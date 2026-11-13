@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsv01"
+version = "0.1.0"
+description = "Ds v0.1 语言定义与 Python 参考驱动（解释器 + dscc/ds 终端命令）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Ds v0.1 contributors" }]
+keywords = ["ds", "language", "interpreter", "reference-driver"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Environment :: Console",
+]
+
+[project.scripts]
+dscc = "dsv01.cli:main_dscc"
+ds = "dsv01.cli:main_ds"
+
+[tool.setuptools]
+packages = ["dsv01"]

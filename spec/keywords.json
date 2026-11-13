@@ -682,7 +682,7 @@
           "position": 2,
           "form": "macro 名(参数: 语法片段) { 模板 }",
           "semantic": "语法宏：解析期展开、默认卫生（模板内新标识符不与调用点冲突）；片段类型为 expr/type/pat/stmt/block/ident/lit；与 comptime fn 分工——macro 操作语法，comptime fn 操作值/类型",
-          "example": "macro unless(c: expr, b: block) { if !c b }"
+          "example": "macro unless(c: expr, b: block) { if !c { b } }"
         },
         {
           "index": 63,

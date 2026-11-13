@@ -1,6 +1,6 @@
 # Ds v0.1 — 新编程语言定义（全量关键词表）
 
-> **定义稿（Definition-only）**：本仓库给出 Ds v0.1 的完整定位、词法、**77 项全量关键词表**、运算符、字面量、注释、EBNF 骨架、语义契约与 `dscc` 编译驱动定义。**不含编译器实现**，示例只保证词法可接受。
+> **定义 + 可执行参考驱动**：本仓库给出 Ds v0.1 的完整定位、词法、**77 项全量关键词表**、运算符、字面量、注释、EBNF、语义契约与 `dscc` 编译驱动定义，并附带 **Python 参考驱动**（词法器 → 解析器 → 树遍历解释器）与 `ds` / `dscc` 终端命令。**不产出机器码**，语言规范本身仍是定义稿。
 
 ## 一键校验
 
@@ -9,6 +9,7 @@ cd ds-v0.1
 python3 tools/ds_keywords.py build                     # 从规范文档生成 spec/keywords.json
 python3 tools/ds_keywords.py check --json spec/keywords.json   # 覆盖/重复/类别/计数校验
 python3 tools/dslex.py                                # 词法自检 + 示例扫描
+python3 -m unittest tests.test_driver -v              # 驱动/语言特性/示例/CLI 测试
 ```
 
 实测结果：
@@ -31,10 +32,62 @@ python3 tools/dslex.py                                # 词法自检 + 示例扫
 | [spec/keywords.json](spec/keywords.json) | 机器可读索引：77 项关键词的形式、语义、示例，含字母序索引 |
 | [tools/ds_keywords.py](tools/ds_keywords.py) | 关键词表校验器 + 索引生成器（与文档双向一致性） |
 | [tools/dslex.py](tools/dslex.py) | 参考词法器：可执行的词法定义 + 自检 + 示例扫描 |
+| [dsv01/](dsv01/) | Python 参考驱动：词法器 + 解析器 + 树遍历解释器 + prelude |
+| [dscc](dscc) / [ds](ds) | 终端命令：`dscc` 编译器风格、`ds` Python 风格（含 REPL） |
 | [examples/tour.ds](examples/tour.ds) | 应用模式综合示例（覆盖 77 个关键字的大部分语法形态） |
 | [examples/concurrency.ds](examples/concurrency.ds) | 并发：`spawn`/`go`/`thread`/`chan`/`send`/`recv`/`mutex`/`wait` |
 | [examples/memory.ds](examples/memory.ds) | 内存：`alloc`/`free`/`rc`/`arc`/`ref`/`ptr`/`raw`/`gc`/`volatile` |
 | [examples/bare.ds](examples/bare.ds) | 裸机：`section`/`at`/`irq`/`asm`/`packed`/`static mut`/`@unsafe` |
+
+## 终端驱动（Python 参考实现）
+
+`dsv01/` 是 Ds v0.1 的可执行参考驱动：**词法器 → 解析器（AST）→ 树遍历解释器**。无需安装即可直接运行：
+
+```bash
+cd ds-v0.1
+./dscc examples/tour.ds --app          # 编译器风格：按规范选项执行
+./ds   examples/tour.ds                # Python 风格：像 python script.py 一样
+./ds -c 'package t
+fn main() { println("hello from Ds") }'   # 类似 python -c
+
+./ds                                   # 进入 REPL（:help / :quit / :load / :reset）
+python3 -m dsv01 examples/tour.ds      # 模块方式运行
+python3 -m dsv01                       # 模块方式 REPL
+```
+
+也可以安装成命令（`pip install -e .` → `dscc`、`ds` 全局可用）。
+
+### 驱动选项
+
+| 选项 | 行为 |
+|---|---|
+| `dscc <file.ds>` / `ds <file.ds>` | 解释执行 `main`；退出码 0/1/2/3/4 与规范一致 |
+| `--app` / `--bare` | 模式（互斥）；`--bare` 默认 `--gc none --rt minimal`，非法组合退 2 |
+| `--target` / `--opt` / `--gc` / `--rt` | 接受并记录（参考驱动不产机器码；`--bare` 约束会校验） |
+| `--emit tokens` | 打印词法记号表（`行:列 类型 文本`） |
+| `--emit ast` | 打印解析后的 AST |
+| `--check` | 仅解析检查 |
+| `-o <path>` | 编译器兼容参数（参考驱动不写可执行文件，会提示忽略） |
+| `-c "code"` | 直接执行一段源码（`ds` 命令） |
+| `--repl` | 强制进入 REPL |
+| `--version` / `-v` | 版本 / 打印运行配置 |
+
+### Python API
+
+```python
+import dsv01
+
+dsv01.run_source('package demo\nfn main() { println("hi") }')
+
+interp = dsv01.Interpreter()
+value = interp.run_file("examples/tour.ds")   # 返回 main 的返回值
+```
+
+### 已实现 vs 近似
+
+- **已实现**：77 关键字词法；声明（`package/mod/use/fn/type/class/trait/impl/static/extern/macro/attr/section`）；控制流（`if/else/loop/while/for/break/continue/return/goto` 标签）；模式匹配（`match/when`/or 模式/`some/ok/err`/数组/映射/类型模式）；`opt/res` + `try/catch` + `panic/recover/assert`；`class` 单继承/`super.init`/`dyn` trait 对象/确定性 `drop`；`|>` 管道；`sizeof/alignof/typeinfo/comptime/attr`；`spawn/go/thread/chan/send/recv/mutex/wait`（Python 线程 + 条件变量）；`alloc/free/rc/arc/gc/ptr/raw/volatile`（bytearray/地址模拟）。
+- **近似**：类型标注不做静态检查（动态类型 + 标注驱动 `is/sizeof/typeinfo`）；不做借用检查与 unsafe 强制；`comptime` 在求值时即时计算；`chan[T]()` 零容量按无界缓冲近似；`spawn` 作用域结束自动等待、`go` 为 daemon 线程；`ptr` 用 bytearray/地址模拟；`extern` 未链接（调用报错）。
+- 这些近似只影响参考驱动的严格程度，不修改规范语义。
 
 ## 全量关键词表（77 项速查）
 
@@ -99,6 +152,7 @@ bash tools/publish.sh owner/repo      # 或指定其他仓库
 
 ## 边界说明
 
-- 本仓库是**语言定义**，不是实现：没有可执行编译器，示例仅通过参考词法器校验，不代表能通过语法/类型检查。
+- **规范是定义稿**；`dsv01/` 是参考驱动（解释执行），用于验证规范可执行、可演示，不产出机器码，也不做静态类型/借用检查。
+- 驱动对部分语义做了近似（零容量通道、`comptime` 求值时机、`ptr` 内存模拟等），详见上文「已实现 vs 近似」；这些近似不修改规范语义。
 - 规范中的示例构造（`math.sqrt`、`println` 等）来自 prelude/std，prelude 清单见规范 §1.4。
 - 未来（0.2）可能升格为关键字的候选词：`struct` `enum` `const` `defer` `async` `await`；在 0.1 中它们仍是合法标识符。

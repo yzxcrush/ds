@@ -1,0 +1,4 @@
+#!/bin/sh
+# dscc — Ds v0.1 编译器风格终端驱动（Python 参考实现，跨平台 shell 启动器）
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "${PYTHON:-python3}" -m dsv01.cli "$@"

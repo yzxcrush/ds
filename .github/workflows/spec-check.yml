@@ -17,3 +17,10 @@ jobs:
         run: python3 tools/ds_keywords.py check --json spec/keywords.json
       - name: 词法自检 + 示例扫描
         run: python3 tools/dslex.py
+      - name: 参考驱动与语言特性测试
+        run: python3 -m unittest tests.test_driver -v
+      - name: 终端驱动冒烟
+        run: |
+          ./dscc examples/tour.ds | head -5
+          ./ds -c 'package t
+          fn main() { println("cli ok") }'

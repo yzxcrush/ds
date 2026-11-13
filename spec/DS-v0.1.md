@@ -164,7 +164,7 @@ Ds 面向"同一份源码可下沉到裸机、可上浮到带 OS 的应用"的�
 | 词 | 形式 | 语义 | 示例 |
 |---|---|---|---|
 | `comptime` | `comptime 表达式`；`comptime { ... }`；`comptime fn`；`comptime if`/`comptime for` | 编译期求值域：内部代码在编译期执行，结果内联；`comptime fn` 可在类型、常量、宏与布局属性中调用；`comptime if` 分支在编译期选定，未选分支不参与类型检查；块内禁止 `asm`/`extern`/I/O | `comptime if sizeof(T) > 8 { ... }` |
-| `macro` | `macro 名(参数: 语法片段) { 模板 }` | 语法宏：解析期展开、默认卫生（模板内新标识符不与调用点冲突）；片段类型为 `expr`/`type`/`pat`/`stmt`/`block`/`ident`/`lit`；与 `comptime fn` 分工——`macro` 操作语法，`comptime fn` 操作值/类型 | `macro unless(c: expr, b: block) { if !c b }` |
+| `macro` | `macro 名(参数: 语法片段) { 模板 }` | 语法宏：解析期展开、默认卫生（模板内新标识符不与调用点冲突）；片段类型为 `expr`/`type`/`pat`/`stmt`/`block`/`ident`/`lit`；与 `comptime fn` 分工——`macro` 操作语法，`comptime fn` 操作值/类型 | `macro unless(c: expr, b: block) { if !c { b } }` |
 | `typeinfo` | `typeinfo(类型)`；`typeinfo::of(表达式)` | 编译期类型反射：返回 `TypeInfo`（字段 `name`/`size`/`align`/`fields`/`traits`/`kind`）；`comptime` 中完全可用；运行期保留需 `--rt full`，否则是编译错误 | `comptime let n = typeinfo(T).name` |
 | `attr` | `attr 名(目标: 属性目标) { 参数... }` | 声明自定义属性：目标 ∈ `fn`/`type`/`class`/`field`/`static`/`mod`/`stmt`/`expr`；声明后以 `@名(参数)` 使用；属性值由 `comptime` 代码读取，编译器不解释语义 | `attr doc(target: fn) { text: str }` |
 

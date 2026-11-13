@@ -92,7 +92,7 @@ fn parse_opt(o: opt[i32]) -> i32 {
 }
 
 macro unless(c: expr, b: block) {
-    if !c b
+    if !c { b }
 }
 
 attr doc(target: fn) {

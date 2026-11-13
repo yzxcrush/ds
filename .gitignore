@@ -14,3 +14,13 @@ a.out
 .DS_Store
 .vscode/
 .idea/
+
+# Python 打包
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# 本地虚拟环境
+.venv/
+.venv-check/

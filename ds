@@ -1,0 +1,4 @@
+#!/bin/sh
+# ds — Ds v0.1 Python 风格终端驱动：ds file.ds 运行、ds 进 REPL
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "${PYTHON:-python3}" -m dsv01 "$@"
