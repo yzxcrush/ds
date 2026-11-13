@@ -231,10 +231,10 @@ def tokenize(src: str, path: str = "<source>") -> list[Token]:
             push(kind, src[start:i], start)
             continue
 
-        # 标识符 / 关键字 / 空白占位符
-        if c.isalpha() or c == "_":
+        # 标识符 / 关键字 / 空白占位符（规范 §1.1：仅 ASCII）
+        if c.isascii() and (c.isalpha() or c == "_"):
             start = i
-            while i < n and (src[i].isalnum() or src[i] == "_"):
+            while i < n and src[i].isascii() and (src[i].isalnum() or src[i] == "_"):
                 i += 1
             text = src[start:i]
             if text == "_":

@@ -289,10 +289,10 @@ def tokenize(src: str, filename: str = "<source>") -> list[Token]:
                                   line, start - line_start + 1))
             continue
 
-        # 标识符 / 关键字 / 空白占位符
-        if c.isalpha() or c == "_":
+        # 标识符 / 关键字 / 空白占位符（规范 §1.1：仅 ASCII [A-Za-z_][A-Za-z0-9_]*）
+        if c.isascii() and (c.isalpha() or c == "_"):
             start = i
-            while i < n and (src[i].isalnum() or src[i] == "_"):
+            while i < n and src[i].isascii() and (src[i].isalnum() or src[i] == "_"):
                 i += 1
             text = src[start:i]
             if text == "_":
