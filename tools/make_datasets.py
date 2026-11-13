@@ -94,6 +94,19 @@ SFT = [
      "`& | ^ ~ << >>` 作用于整数；移位量越界会 panic。\n\n```ds\npackage demo\n\nfn main() {\n    println(0b1010 & 0b1100)\n    println(1 << 4)\n    println(~0)\n}\n```"),
     ("Ds 支持 goto 吗？怎么用？",
      "支持，但限制在同函数内；标签写作 `名字:`。\n\n```ds\npackage demo\n\nfn spin(limit: u32) -> u32 {\n    var n: u32 = 0\nagain:\n    n = n + 1\n    if n < limit { goto again }\n    n\n}\n\nfn main() {\n    println(spin(3))\n}\n```"),
+    ("用最省 token 的 Ds 精简写法写一个 hello world。",
+     "```ds\nprintln(\"hello, Ds\")\n```\n\n无需 `package` 与 `fn main`：顶层语句就是入口。"),
+    ("用精简写法写斐波那契并输出前 10 项（含 f-string）。",
+     "```ds\nfn fib(n)=if n<2: n else fib(n-1)+fib(n-2)\nfor i in 0..10: println(f\"fib({i})={fib(i)}\")\n```"),
+    ("精简写法里怎么写循环和累加？",
+     "```ds\nvar total=0\nfor i in 1..6: total+=i\nwhile total<20: total+=1\nprintln(total)\n```\n\n`a..b` 是半开区间；`+=` 是复合赋值；单语句体用 `:`。"),
+    ("用精简写法定义值类型并加一个方法。",
+     "```ds\ntype Point { x: f32, y: f32 }\nimpl Point {\n    fn len(ref self)=math.sqrt(self.x*self.x + self.y*self.y)\n}\nlet p=Point(x:3.0, y:4.0)\nprintln(f\"len={p.len()}\")\n```"),
+    ("用精简写法写类与继承。",
+     "```ds\nclass Shape {\n    name: str\n    fn new(name: str): self.name = name\n}\nclass Circle extends Shape {\n    fn new(name: str): super.init(name)\n}\nlet c=Circle.new(\"c\")\nprintln(f\"shape={c.name}\")\n```"),
+    ("把这段经典写法改成最省 token 的精简写法：\n```ds\npackage demo\nfn add(a: i32, b: i32) -> i32 {\n    a + b\n}\nfn main() {\n    println(add(2, 3))\n}\n```",
+     "```ds\nfn add(a,b)=a+b\nprintln(add(2,3))\n```\n\n省去 package/fn main、参数与返回类型、花括号与 return。"),
+
 ]
 
 # ---------------------------------------------------------------------------
@@ -362,6 +375,13 @@ fn main() {
     }
 }
 '''),
+    ("hello_c", "Hello（精简）", "用精简写法输出 hello, Ds!（无 package / 无 fn main）。",
+     'println("hello, Ds!")\n'),
+    ("fib_c", "斐波那契（精简）", "用精简写法打印 fib(10)。",
+     'fn fib(n)=if n<2: n else fib(n-1)+fib(n-2)\nprintln(fib(10))\n'),
+    ("fstr_c", "f-string（精简）", "用精简写法打印 ans=42（x=7，x*6）。",
+     'let x=7\nprintln(f"ans={x*6}")\n'),
+
 ]
 
 # ---------------------------------------------------------------------------

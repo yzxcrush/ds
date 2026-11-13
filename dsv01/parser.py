@@ -20,12 +20,14 @@
 from __future__ import annotations
 
 from . import ast
+from . import lexer as _lexer
 from .lexer import (
     BLANK,
     BYTES,
     COMMENT,
     EOF,
     FLOAT,
+    FSTRING,
     IDENT,
     INT,
     KEYWORD,
@@ -46,6 +48,7 @@ __all__ = ["Parser", "parse_program", "parse_repl"]
 # ---------------------------------------------------------------------------
 _PREC = {
     "|>": 1,
+    "..": 2,
     "||": 2,
     "&&": 3,
     "|": 4,
@@ -71,6 +74,9 @@ _PREC = {
 
 # 不可链式使用的运算符（§2.2）
 _NONASSOC = {"==", "!=", "<", ">", "<=", ">=", "is", "in"}
+
+# 精简写法：复合赋值
+_COMPOUND = {"+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="}
 
 _VIS_KEYWORDS = ("pub", "priv", "prot")
 
@@ -316,12 +322,16 @@ class Parser:
                 package = self.parse_name()
                 self.skip_seps()
                 continue
-            nodes = self.parse_item_or_use()
-            for node in nodes:
-                if isinstance(node, ast.Use):
-                    uses.append(node)
-                else:
-                    items.append(node)
+            if self._at_item_start():
+                nodes = self.parse_item_or_use()
+                for node in nodes:
+                    if isinstance(node, ast.Use):
+                        uses.append(node)
+                    else:
+                        items.append(node)
+            else:
+                # 精简写法：允许顶层语句（隐式入口，无需 package / fn main）
+                items.append(self.parse_stmt())  # type: ignore[arg-type]
             self.skip_seps()
         return ast.Program(
             package=package,
@@ -531,6 +541,18 @@ class Parser:
             self.advance()
             self.skip_nl()
             body = self.parse_expr()
+        elif self.at_sym("="):
+            # 精简写法：fn add(a, b) = a + b
+            self.advance()
+            self.skip_nl()
+            body = self.parse_expr()
+        elif self.at_punct(":"):
+            # 精简写法：fn new(name): self.name = name
+            t = self.tok
+            self.advance()
+            self.skip_nl()
+            stmt = self.parse_stmt()
+            body = ast.Block(stmts=[stmt], line=t.line, col=t.col)
         if self.at_kw("at"):
             self.advance()
             self.skip_nl()
@@ -1136,6 +1158,21 @@ class Parser:
     # ------------------------------------------------------------------
     # 语句
     # ------------------------------------------------------------------
+    def parse_body(self) -> ast.Block:
+        """精简写法：`{...}` 块，或 `:` 后单条语句（Python 风格）。"""
+        if self.at_punct("{"):
+            return self.parse_block()
+        if self.at_punct(":"):
+            t = self.tok
+            self.advance()
+            self.skip_nl()
+            stmt = self.parse_stmt()
+            return ast.Block(stmts=[stmt], line=t.line, col=t.col)
+        # 精简写法：省略冒号，直接单条语句（如 `if c: a else b` 的 else 分支）
+        t = self.tok
+        stmt = self.parse_stmt()
+        return ast.Block(stmts=[stmt], line=t.line, col=t.col)
+
     def parse_block(self) -> ast.Block:
         t = self.tok
         line, col = t.line, t.col
@@ -1163,11 +1200,11 @@ class Parser:
                 cond = self.parse_expr()
             finally:
                 self.block_guard -= 1
-            body = self.parse_block()
+            body = self.parse_body()
             return ast.WhileStmt(cond=cond, body=body, line=line, col=col)
         if self.at_kw("loop"):
             self.advance()
-            body = self.parse_block()
+            body = self.parse_body()
             return ast.LoopStmt(body=body, line=line, col=col)
         if self.at_kw("for"):
             stmt = self.parse_for()
@@ -1245,6 +1282,12 @@ class Parser:
             return ast.LabelStmt(name=t.text, line=line, col=col)
         # 表达式语句 / 赋值语句
         expr = self.parse_expr()
+        if self.tok.kind == OP and self.tok.text in _COMPOUND:
+            op = self.tok.text
+            self.advance()
+            self.skip_nl()
+            value = self.parse_expr()
+            return ast.AssignStmt(target=expr, value=value, op=op, line=line, col=col)
         if self.at_sym("="):
             self.advance()
             self.skip_nl()
@@ -1279,7 +1322,7 @@ class Parser:
             iterable = self.parse_expr()
         finally:
             self.block_guard -= 1
-        body = self.parse_block()
+        body = self.parse_body()
         return ast.ForStmt(
             pattern=pattern, iterable=iterable, body=body, line=line, col=col
         )
@@ -1896,6 +1939,9 @@ class Parser:
         if t.kind in (INT, FLOAT, STRING, BYTES):
             self.advance()
             return ast.Lit(value=t.text, line=line, col=col)
+        if t.kind == FSTRING:
+            self.advance()
+            return self.parse_fstring(t)
         if t.kind == BLANK:
             self.advance()
             return ast.Var(name="_", line=line, col=col)
@@ -2033,6 +2079,49 @@ class Parser:
         blk = self.parse_block()
         return ast.UnsafeBlock(block=blk, line=line, col=col)
 
+    def parse_fstring(self, tok) -> ast.Expr:
+        raw = tok.text
+        parts: list = []
+        buf: list[str] = []
+
+        def flush() -> None:
+            if not buf:
+                return
+            seg = "".join(buf)
+            buf.clear()
+            try:
+                parts.append(_lexer._decode_string(
+                    '"' + seg + '"', self.filename, tok.line, tok.col))
+            except Exception:
+                parts.append(seg)
+
+        i = 0
+        while i < len(raw):
+            ch = raw[i]
+            if ch == "{" and i + 1 < len(raw) and raw[i + 1] == "{":
+                buf.append("{")
+                i += 2
+                continue
+            if ch == "}" and i + 1 < len(raw) and raw[i + 1] == "}":
+                buf.append("}")
+                i += 2
+                continue
+            if ch == "{":
+                j = raw.find("}", i + 1)
+                if j < 0:
+                    self.error("f-string 插值未闭合", tok)
+                expr_src = raw[i + 1:j].strip()
+                if not expr_src:
+                    self.error("f-string 插值不能为空", tok)
+                flush()
+                parts.append(Parser(expr_src, self.filename).parse_expr())
+                i = j + 1
+                continue
+            buf.append(ch)
+            i += 1
+        flush()
+        return ast.FString(parts=parts, line=tok.line, col=tok.col)
+
     def parse_fn_lit(self) -> ast.FnLit:
         t = self.tok
         line, col = t.line, t.col
@@ -2151,7 +2240,7 @@ class Parser:
         finally:
             self.block_guard -= 1
         self.skip_nl()
-        then_block = self.parse_block()
+        then_block = self.parse_body()
         else_ = None
         self.skip_nl()
         if self.at_kw("else"):
@@ -2160,7 +2249,7 @@ class Parser:
             if self.at_kw("if"):
                 else_ = self.parse_if()
             else:
-                else_ = self.parse_block()
+                else_ = self.parse_body()
         return ast.IfExpr(
             cond=cond, then_block=then_block, else_=else_, line=line, col=col
         )

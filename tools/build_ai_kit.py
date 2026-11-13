@@ -31,6 +31,7 @@ def run_example(path: Path) -> str:
 
 def build() -> str:
     card = read("ai/LANGUAGE_CARD.md")
+    concise = read("spec/DS-CONCISE.md")
     spec = read("spec/DS-v0.1.md")
     llms = read("llms.txt")
     keywords = read("spec/keywords.json")
@@ -52,7 +53,11 @@ def build() -> str:
         system,
         "```",
         "",
-        "## 2. Language Card",
+        "## 2. 精简写法（0.1c，AI 默认推荐）",
+        "",
+        concise,
+        "",
+        "## 2b. Language Card",
         "",
         card,
         "",

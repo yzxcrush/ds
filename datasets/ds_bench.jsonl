@@ -17,3 +17,6 @@
 {"id": "comptime", "title": "编译期检查", "prompt": "用 comptime 检查 sizeof(u64)==8 且 alignof(u64)==8，然后打印 ok。", "expected_stdout": "ok\n", "difficulty": "medium"}
 {"id": "macro", "title": "宏", "prompt": "定义宏 unless(c,b)，调用 unless(false,{ println(\"fired\") })。", "expected_stdout": "fired\n", "difficulty": "medium"}
 {"id": "concurrency", "title": "通道", "prompt": "chan[i32](4) 发送 42 再 recv，打印 got 42。", "expected_stdout": "got 42\n", "difficulty": "medium"}
+{"id": "hello_c", "title": "Hello（精简）", "prompt": "用精简写法输出 hello, Ds!（无 package / 无 fn main）。", "expected_stdout": "hello, Ds!\n", "difficulty": "medium"}
+{"id": "fib_c", "title": "斐波那契（精简）", "prompt": "用精简写法打印 fib(10)。", "expected_stdout": "55\n", "difficulty": "medium"}
+{"id": "fstr_c", "title": "f-string（精简）", "prompt": "用精简写法打印 ans=42（x=7，x*6）。", "expected_stdout": "ans=42\n", "difficulty": "medium"}

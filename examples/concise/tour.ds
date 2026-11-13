@@ -1,0 +1,30 @@
+# Ds 精简写法综合示例（与 examples/tour.ds 能力相同，token 更少）
+fn fib(n)=if n<2: n else fib(n-1)+fib(n-2)
+fn div(a,b)=if b==0: err(error("zero")) else ok(a/b)
+
+type Point { x: f32, y: f32 }
+impl Point {
+    fn len(ref self)=math.sqrt(self.x*self.x + self.y*self.y)
+}
+
+class Shape {
+    name: str
+    fn new(name: str): self.name = name
+    fn describe(self)="shape " + self.name
+}
+
+var total=0
+for i in 1..6: total+=i
+println(f"fib(10)={fib(10)}")
+println(f"total={total}")
+
+let p=Point(x:3.0, y:4.0)
+println(f"len={p.len()}")
+
+let c=Shape.new("ds")
+println(c.describe())
+
+match div(6,3) {
+    ok(v)=>println(f"ok {v}"),
+    err(e)=>println("err"),
+}

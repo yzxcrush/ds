@@ -49,7 +49,8 @@ KEYWORDS = load_keywords()
 
 # 字符级运算符表（按长度降序匹配；`[]` 是标点不是单一 token）
 OPS = [
-    "|>", "->", "=>", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
+    "|>", "->", "=>", "<<=", ">>=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
+    "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "..",
     "+", "-", "*", "/", "%", "=", "!", "<", ">", "&", "|", "^", "~", ".", "@",
 ]
 _OPS_SORTED = sorted(OPS, key=len, reverse=True)
@@ -58,6 +59,7 @@ PUNCT = set("(){}[],:;")
 KEYWORD, IDENT, RAW_IDENT = "KEYWORD", "IDENT", "RAW_IDENT"
 INT, FLOAT, STRING, BYTES = "INT", "FLOAT", "STRING", "BYTES"
 OP, PUNCT_KIND, BLANK = "OP", "PUNCT", "BLANK"
+FSTRING = "FSTRING"
 COMMENT, NEWLINE, EOF = "COMMENT", "NEWLINE", "EOF"
 
 _ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "\\": "\\", '"': '"', "0": "\0"}
@@ -213,6 +215,30 @@ def tokenize(src: str, filename: str = "<source>") -> list[Token]:
             payload = src[i + 2:j]
             toks.append(Token(BYTES, payload.encode("utf-8"), line, start - line_start + 1))
             i = j + 1
+            continue
+
+        # 插值字符串 f"...{expr}..."
+        if c in ("f", "F") and i + 1 < n and src[i + 1] == '"':
+            start = i
+            j = i + 2
+            buf = []
+            while j < n:
+                ch = src[j]
+                if ch == "\\":
+                    buf.append(src[j:j + 2])
+                    j += 2
+                    continue
+                if ch == "\n":
+                    raise err("字符串不可含裸换行", start)
+                if ch == '"':
+                    j += 1
+                    break
+                buf.append(ch)
+                j += 1
+            else:
+                raise err("字符串未闭合", start)
+            toks.append(Token(FSTRING, "".join(buf), line, start - line_start + 1))
+            i = j
             continue
 
         # 原始标识符 `名`

@@ -162,6 +162,36 @@ python3 tools/ds_bench.py --submissions 模型提交.jsonl --json result.json
 
 详细投喂/微调/评测方式见 [ai/README.md](ai/README.md)。
 
+## 精简写法（0.1c，省 token）
+
+语义与 77 关键字完全不变，只把「写」变短，**AI 生成默认推荐**（旧写法仍合法、可混用）：
+
+```ds
+# 经典
+package hello
+fn main() {
+    println("hello, Ds")
+}
+```
+
+```ds
+# 精简（同一程序）
+println("hello, Ds")
+```
+
+| 规则 | 精简写法 |
+|---|---|
+| 无样板 | 不需要 `package`/`fn main`，顶层语句即入口 |
+| 函数 | `fn add(a,b)=a+b` / `fn say(x): println(x)` |
+| 单语句块 | `for i in 0..10: println(i)` / `if c: a else b` |
+| 变量 | `x=1` 即不可变定义；可变用 `var`；`+= -= *= /= %=` 等 |
+| 范围 | `0..10`（半开，等价 `range(0,10)`） |
+| 插值 | `f"x={x} n={x+1}"` |
+| 类型 | 全部可省略 |
+
+实测常见程序平均省 **31%** token（hello 省 61%，错误处理省 45%）；`python3 tools/token_report.py` 可复跑。
+完整规则：[spec/DS-CONCISE.md](spec/DS-CONCISE.md)。
+
 ## 全量关键词表（77 项速查）
 
 | 类别 | 数 | 关键词 |

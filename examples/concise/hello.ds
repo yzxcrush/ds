@@ -1,0 +1,2 @@
+# 最省 token 的 hello：无 package、无 fn main
+println("hello, Ds")

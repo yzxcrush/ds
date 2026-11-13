@@ -200,6 +200,15 @@ class Lit(Expr):
 
 
 @dataclass
+class FString(Expr):
+    """f"...{expr}..." 插值字符串；parts 为 str 与 Expr 的混合列表。"""
+
+    parts: list[Any] = field(default_factory=list)
+    line: int = 0
+    col: int = 0
+
+
+@dataclass
 class ArrayLit(Expr):
     items: list[Expr] = field(default_factory=list)
     line: int = 0
@@ -500,6 +509,7 @@ class LetStmt(Stmt):
 class AssignStmt(Stmt):
     target: Expr = None
     value: Expr = None
+    op: str = "="
     line: int = 0
     col: int = 0
 

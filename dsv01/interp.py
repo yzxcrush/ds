@@ -69,6 +69,14 @@ class Env:
     def has_local(self, name: str) -> bool:
         return name in self.vars
 
+    def has(self, name: str) -> bool:
+        env: Env | None = self
+        while env is not None:
+            if name in env.vars:
+                return True
+            env = env.parent
+        return False
+
     def lookup(self, name: str) -> Any:
         env: Env | None = self
         while env is not None:
@@ -137,6 +145,7 @@ class Interpreter:
 
         self._expr_dispatch = {
             ast.Lit: self.ev_lit,
+            ast.FString: self.ev_fstring,
             ast.ArrayLit: self.ev_array,
             ast.MapLit: self.ev_map,
             ast.Var: self.ev_var,
@@ -235,9 +244,20 @@ class Interpreter:
     def _process_unit(self, items: list[ast.Item], env: Env, base_dir: str,
                       *, run_main: bool) -> None:
         ctx = UnitCtx()
+        stmts: list[ast.Stmt] = []
         for item in items:
-            self.declare_item(item, env, base_dir, ctx)
+            if isinstance(item, ast.Item):
+                self.declare_item(item, env, base_dir, ctx)
+            else:
+                # 精简写法：顶层语句 = 隐式入口
+                stmts.append(item)
         self._finish_ctx(ctx, env)
+
+        last: Any = bi.UNIT
+        for stmt in stmts:
+            last = self.exec_stmt(stmt, env)
+        if stmts:
+            self._last_value = last
 
         main = None
         if env.has_local("main"):
@@ -247,9 +267,9 @@ class Interpreter:
                 main = env.lookup("main")
             except bi.DsRuntimeError:
                 main = None
-        if run_main and main is not None:
+        if run_main and not stmts and main is not None:
             self._last_value = self.call_value(main, [], [])
-        else:
+        elif not stmts:
             self._last_value = bi.UNIT
 
     def _finish_ctx(self, ctx: UnitCtx, env: Env) -> None:
@@ -495,8 +515,15 @@ class Interpreter:
         return bi.UNIT
 
     def ex_assign(self, stmt: ast.AssignStmt, env: Env) -> Any:
-        value = self.eval_expr(stmt.value, env)
-        self.assign_place(stmt.target, value, env)
+        op = getattr(stmt, "op", "=")
+        if op == "=":
+            value = self.eval_expr(stmt.value, env)
+            self.assign_place(stmt.target, value, env, define_if_missing=True)
+        else:
+            current = self.eval_expr(stmt.target, env)
+            rhs = self.eval_expr(stmt.value, env)
+            value = self.binop(op[:-1], current, rhs)
+            self.assign_place(stmt.target, value, env)
         return bi.UNIT
 
     def ex_while(self, stmt: ast.WhileStmt, env: Env) -> Any:
@@ -599,6 +626,15 @@ class Interpreter:
 
     def ev_lit(self, expr: ast.Lit, env: Env) -> Any:
         return expr.value
+
+    def ev_fstring(self, expr: ast.FString, env: Env) -> Any:
+        out: list[str] = []
+        for part in expr.parts:
+            if isinstance(part, str):
+                out.append(part)
+            else:
+                out.append(bi.to_str(self.eval_expr(part, env)))
+        return "".join(out)
 
     def ev_array(self, expr: ast.ArrayLit, env: Env) -> Any:
         return [self.eval_expr(item, env) for item in expr.items]
@@ -759,6 +795,10 @@ class Interpreter:
             if isinstance(left, int) and isinstance(right, int):
                 return left ^ right
             raise self._bin_err("^", left, right)
+        if op == "..":
+            if isinstance(left, int) and isinstance(right, int):
+                return list(range(left, right))
+            raise bi.DsRuntimeError("`..` 需要两个整数端点")
         if op == "==":
             return self.ds_eq(left, right)
         if op == "!=":
@@ -1273,12 +1313,16 @@ class Interpreter:
     # ==================================================================
     # 赋值 / 析构
     # ==================================================================
-    def assign_place(self, target: ast.Expr, value: Any, env: Env) -> None:
+    def assign_place(self, target: ast.Expr, value: Any, env: Env,
+                     define_if_missing: bool = False) -> None:
         if isinstance(target, ast.Var):
             if target.name == "_":
                 self.drop_value(value)
                 return
-            env.assign(target.name, value)
+            if define_if_missing and not env.has(target.name):
+                env.define(target.name, value, mutable=False)
+            else:
+                env.assign(target.name, value)
             return
         if isinstance(target, ast.AttrExpr):
             obj = self.eval_expr(target.obj, env)

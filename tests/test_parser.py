@@ -910,13 +910,15 @@ class TestDeclarations(unittest.TestCase):
         self.assertIsInstance(m.body, ast.Block)
         self.assertTrue(m.body.stmts)
 
-    def test_macro_raw_template_fallback(self):
-        # 模板可以是"非合法 Ds 片段"（片段占位），解析器必须仍接受
+    def test_macro_concise_template(self):
+        # 0.1c 精简写法：`if !c b` 现在解析为「if + 单语句体」，宏模板更自然
         prog = program("macro odd(c: expr) { if !c b }\nfn g() {}\n")
         m = prog.items[0]
         self.assertIsInstance(m, ast.MacroDecl)
         self.assertIsInstance(m.body, ast.Block)
-        self.assertEqual(m.body.stmts, [])
+        self.assertTrue(m.body.stmts)
+        self.assertIsInstance(m.body.stmts[0], ast.ExprStmt)
+        self.assertIsInstance(m.body.stmts[0].expr, ast.IfExpr)
 
     def test_attr_decl(self):
         prog = program("attr doc(target: fn) { text: str }\n")
