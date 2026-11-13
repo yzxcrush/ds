@@ -139,6 +139,29 @@ value = interp.run_file("examples/tour.ds")   # 返回 main 的返回值
 - **近似**：类型标注不做静态检查（动态类型 + 标注驱动 `is/sizeof/typeinfo`）；不做借用检查与 unsafe 强制；`comptime` 在求值时即时计算；`chan[T]()` 零容量按无界缓冲近似；`spawn` 作用域结束自动等待、`go` 为 daemon 线程；`ptr` 用 bytearray/地址模拟；`extern` 未链接（调用报错）。
 - 这些近似只影响参考驱动的严格程度，不修改规范语义。
 
+## 让其他 AI 学习 Ds
+
+本仓库同时是 Ds 的「AI 学习包」：可检索、可执行、可评测。
+
+| 物料 | 入口 |
+|---|---|
+| AI 检索入口（llms.txt 约定） | [llms.txt](llms.txt) |
+| 一页纸语言卡（先读） | [ai/LANGUAGE_CARD.md](ai/LANGUAGE_CARD.md) |
+| 全量上下文（约 120 KB） | [ai/llms-full.txt](ai/llms-full.txt) |
+| 系统提示词 | [ai/system_prompt.txt](ai/system_prompt.txt) |
+| Agent 操作约定 | [AGENTS.md](AGENTS.md) |
+| 指令微调数据（32 条） | [datasets/ds_sft.jsonl](datasets/ds_sft.jsonl) |
+| 语料（10 篇） | [datasets/ds_corpus.jsonl](datasets/ds_corpus.jsonl) |
+| 评测集（19 任务） | [datasets/ds_bench.jsonl](datasets/ds_bench.jsonl) |
+| 评测脚本 | [tools/ds_bench.py](tools/ds_bench.py) |
+
+```bash
+python3 tools/ds_bench.py --list
+python3 tools/ds_bench.py --submissions 模型提交.jsonl --json result.json
+```
+
+详细投喂/微调/评测方式见 [ai/README.md](ai/README.md)。
+
 ## 全量关键词表（77 项速查）
 
 | 类别 | 数 | 关键词 |

@@ -1,0 +1,19 @@
+{"id": "hello", "title": "Hello World", "prompt": "输出 hello, Ds!（使用 println）。", "expected_stdout": "hello, Ds!\n", "difficulty": "easy"}
+{"id": "sum", "title": "累加 1..10", "prompt": "计算 1+2+...+10 并打印结果。", "expected_stdout": "55\n", "difficulty": "easy"}
+{"id": "fib", "title": "斐波那契", "prompt": "打印 fib(10)。", "expected_stdout": "55\n", "difficulty": "easy"}
+{"id": "fizzbuzz", "title": "FizzBuzz", "prompt": "打印 1..15，3 的倍数打印 Fizz，5 的倍数打印 Buzz，都满足打印 FizzBuzz，否则打印数字。", "expected_stdout": "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n", "difficulty": "easy"}
+{"id": "primes", "title": "质数表", "prompt": "打印 30 以内的质数，以空格分隔，最后换行。", "expected_stdout": "2 3 5 7 11 13 17 19 23 29 \n", "difficulty": "easy"}
+{"id": "reverse", "title": "反转数组", "prompt": "把 [1 2 3 4 5] 反转为 [5 4 3 2 1] 并打印。", "expected_stdout": "[5 4 3 2 1]\n", "difficulty": "medium"}
+{"id": "wordcount", "title": "词频统计", "prompt": "统计 \"a b a c b a\" 中每个词出现次数并打印映射。", "expected_stdout": "{a: 3, b: 2, c: 1}\n", "difficulty": "medium"}
+{"id": "bubble", "title": "冒泡排序", "prompt": "对 [5 3 8 1 9 2] 升序排序并打印。", "expected_stdout": "[1 2 3 5 8 9]\n", "difficulty": "medium"}
+{"id": "gcd", "title": "最大公约数", "prompt": "打印 gcd(84, 36)。", "expected_stdout": "12\n", "difficulty": "medium"}
+{"id": "bsearch", "title": "二分查找", "prompt": "在 [1 3 5 7 9] 中查找 7，打印下标。", "expected_stdout": "3\n", "difficulty": "medium"}
+{"id": "point", "title": "值类型与方法", "prompt": "定义 Point{x,y}，构造 Point(x:3,y:4)，打印 x*10+y。", "expected_stdout": "34\n", "difficulty": "medium"}
+{"id": "shape", "title": "类与继承", "prompt": "定义 Shape(name) 与 Circle extends Shape，构造 Circle.new(\"c\") 并打印 name。", "expected_stdout": "c\n", "difficulty": "medium"}
+{"id": "trait", "title": "trait 与动态派发", "prompt": "定义 trait Draw{draw}、type Box、impl Draw for Box 打印 box。", "expected_stdout": "box\nbox\n", "difficulty": "medium"}
+{"id": "opt", "title": "opt 与 match", "prompt": "函数 pick(opt[i32])：some 返回值，none 返回 -1；打印 pick(some(5)) 与 pick(none)。", "expected_stdout": "5\n-1\n", "difficulty": "medium"}
+{"id": "res", "title": "res 与 try", "prompt": "函数 div 返回 res；div(6,3) 打印 ok，div(1,0) 打印 err。", "expected_stdout": "ok\nerr\n", "difficulty": "medium"}
+{"id": "pipe", "title": "管道", "prompt": "用 |> 把 5 依次传给 inc、dbl，打印结果。", "expected_stdout": "12\n", "difficulty": "medium"}
+{"id": "comptime", "title": "编译期检查", "prompt": "用 comptime 检查 sizeof(u64)==8 且 alignof(u64)==8，然后打印 ok。", "expected_stdout": "ok\n", "difficulty": "medium"}
+{"id": "macro", "title": "宏", "prompt": "定义宏 unless(c,b)，调用 unless(false,{ println(\"fired\") })。", "expected_stdout": "fired\n", "difficulty": "medium"}
+{"id": "concurrency", "title": "通道", "prompt": "chan[i32](4) 发送 42 再 recv，打印 got 42。", "expected_stdout": "got 42\n", "difficulty": "medium"}

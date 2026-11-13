@@ -1,0 +1,33 @@
+# Ds v0.1
+
+> Ds 是一门静态类型、显式内存、可裸机运行、编译期可元编程的系统级编程语言。
+> 本文件面向 AI 检索：给出语言定义、关键词表、参考驱动与评测数据集的入口。
+> 版本 0.1.0；77 个硬关键字；规范 CC-BY-4.0，代码 MIT。
+
+## 核心文档
+
+- [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
+- [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
+- [机器可读关键词表 spec/keywords.json](spec/keywords.json)
+- [给 AI Agent 的说明 ai/AGENTS.md](ai/AGENTS.md)
+
+## 可执行参考实现
+
+- [Python 参考驱动 dsv01/](dsv01/)
+- [终端命令 ds / dscc](ds)
+- [示例 examples/](examples/)
+
+## 训练与评测数据
+
+- [SFT 指令数据 datasets/ds_sft.jsonl](datasets/ds_sft.jsonl)
+- [语料 datasets/ds_corpus.jsonl](datasets/ds_corpus.jsonl)
+- [评测集 datasets/ds_bench.jsonl](datasets/ds_bench.jsonl)
+- [评测脚本 tools/ds_bench.py](tools/ds_bench.py)
+
+## 快速验证
+
+```bash
+python3 tools/ds_keywords.py check --json spec/keywords.json
+python3 -m unittest discover -s tests
+./dscc examples/tour.ds
+```

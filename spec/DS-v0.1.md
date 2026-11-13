@@ -202,7 +202,7 @@ Ds 面向"同一份源码可下沉到裸机、可上浮到带 OS 的应用"的�
 - **构造器与常量**：`true` `false` `none` `some` `ok` `err` `unit`。
 - **核心 trait**：`Eq` `Ord` `Hash` `Default` `Clone` `Copy` `Send` `Sync` `Drop` `Display` `Error` `Into` `TryFrom`。
 - **内建对象**：`range(a, b)`（整数半开区间，`for` 用）、`error`（默认错误类型）、`AssertFailed`、`Cancelled`。
-- **常用函数**：`print`、`println`、`format`、`concat`（均可被同名项遮蔽）。
+- **常用函数**：`print`、`println`、`format`、`concat`、`len`、`str`、`abs`、`pow`（均可被同名项遮蔽）。
 - **内存相关**：`allocator`（分配器接口）、`atomic[T]`、`spinlock`（`--bare` 的 `mutex` 后端）。
 
 ### 1.5 硬关键字、原始标识符与未来保留

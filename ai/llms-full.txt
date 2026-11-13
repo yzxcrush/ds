@@ -1,0 +1,2906 @@
+# Ds v0.1 — AI 完整学习包（llms-full）
+
+> 由 `tools/build_ai_kit.py` 从语言卡、规范、示例与数据集自动汇编。
+
+## 0. llms.txt 索引
+
+# Ds v0.1
+
+> Ds 是一门静态类型、显式内存、可裸机运行、编译期可元编程的系统级编程语言。
+> 本文件面向 AI 检索：给出语言定义、关键词表、参考驱动与评测数据集的入口。
+> 版本 0.1.0；77 个硬关键字；规范 CC-BY-4.0，代码 MIT。
+
+## 核心文档
+
+- [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
+- [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
+- [机器可读关键词表 spec/keywords.json](spec/keywords.json)
+- [给 AI Agent 的说明 ai/AGENTS.md](ai/AGENTS.md)
+
+## 可执行参考实现
+
+- [Python 参考驱动 dsv01/](dsv01/)
+- [终端命令 ds / dscc](ds)
+- [示例 examples/](examples/)
+
+## 训练与评测数据
+
+- [SFT 指令数据 datasets/ds_sft.jsonl](datasets/ds_sft.jsonl)
+- [语料 datasets/ds_corpus.jsonl](datasets/ds_corpus.jsonl)
+- [评测集 datasets/ds_bench.jsonl](datasets/ds_bench.jsonl)
+- [评测脚本 tools/ds_bench.py](tools/ds_bench.py)
+
+## 快速验证
+
+```bash
+python3 tools/ds_keywords.py check --json spec/keywords.json
+python3 -m unittest discover -s tests
+./dscc examples/tour.ds
+```
+
+
+## 1. 系统提示词（可直接粘贴给模型）
+
+```text
+你是 Ds v0.1 专家。Ds 是一门静态类型、显式内存、可裸机运行、编译期可元编程的系统级语言，
+共 77 个硬关键字（73 字母 + @ -> => |> 四个符号），全部不可作标识符。
+回答时必须遵守：
+- 文件首行 `package 名`；入口 `fn main() { }`；语句换行或 `;` 结束。
+- 泛型与数组用方括号 `[T]`；空映射写 `{:}`；映射写 `{k:v}`；类实例用 `类.new(...)` 构造，
+  值类型用 `名(字段: 值)` 构造；不存在结构体字面量。
+- 箭头分工：`->` 类型、`=>` 分支/单表达式函数体、`|>` 表达式管道。
+- 变量：`let` 不可变、`var` 可变；不存在 `let mut`。
+- 错误分层：可恢复用 `res[T,E]`/`opt[T]` + `try`/`catch`；不可恢复 `panic`；`assert` 查不变量。
+- 生成代码时使用 ```ds 代码块，并在末尾给出等价的 `dscc 文件.ds` 运行方式。
+- 不确定的语义先查语言卡（ai/LANGUAGE_CARD.md）与规范（spec/DS-v0.1.md），不要编造关键字。
+
+```
+
+## 2. Language Card
+
+# Ds v0.1 Language Card
+
+> 给 AI 的「一页纸」语言卡：完整关键词表、语法骨架、语义要点、可验证示例。
+> 规范全文见 `spec/DS-v0.1.md`；机器可读索引见 `spec/keywords.json`。
+> 版本 0.1.0 ｜ 关键词 77 项 ｜ 许可证：规范 CC-BY-4.0，代码 MIT
+
+## 1. 定位
+
+Ds 是一门**静态类型、显式内存、可裸机运行、编译期可元编程**的系统级语言。
+设计契约：小核心（77 硬关键字）、显式内存（栈/静态/`alloc`/`rc`/`arc`/`gc` 五选一）、
+确定性析构、错误分层（`res`/`opt` → `panic` → `assert`）、结构化并发、裸机优先（`--bare`）、
+编译期元编程（`comptime`/`macro`/`typeinfo`/`attr`）、单继承 + trait。
+
+`dscc` 一次编译一个包；包根文件第一行必须是 `package 名`。
+
+## 2. 全量关键词表（77）
+
+**定义（9）** `fn` `let` `var` `type` `class` `trait` `impl` `mod` `package`
+**控制（9）** `if` `else` `loop` `while` `for` `break` `continue` `return` `goto`
+**管道（3）** `->` `=>` `|>`
+**错误（7）** `try` `catch` `panic` `recover` `assert` `res` `opt`
+**模块（8）** `use` `as` `export` `pub` `priv` `prot` `static` `extern`
+**并发（8）** `spawn` `go` `thread` `chan` `send` `recv` `mutex` `wait`
+**内存（9）** `raw` `free` `alloc` `rc` `arc` `gc` `ptr` `ref` `mut`
+**裸机（7）** `@` `asm` `volatile` `at` `irq` `section` `packed`
+**元编程（4）** `comptime` `macro` `typeinfo` `attr`
+**OOP（6）** `self` `super` `new` `drop` `extends` `dyn`
+**模式（7）** `match` `when` `where` `in` `is` `sizeof` `alignof`
+
+= 73 个字母关键字 + `@` `->` `=>` `|>` 4 个符号关键字。全部为**硬关键字**，不可作标识符；
+需要与外部符号同名时用反引号原始标识符：`` `free` ``。
+
+## 3. 词法
+
+- 标识符：`[A-Za-z_][A-Za-z0-9_]*`（仅 ASCII；`_` 单独出现是占位符）。
+- 语句以换行终止，`;` 等价；`{}` 界定块，缩进无语义。
+- 注释：`#` 行注释、`//` 行注释、`#| ... |#` 可嵌套块注释。
+- 字面量：`5` `-3` `0xFF` `0b1010` `"str"`（转义 `\n \r \t \\ \" \0 \xNN \u{...}`）
+  `b"raw"`（原始字节串，不转义）、`[1 2 3]`（数组，空白或逗号分隔）、`{k:v}`（映射）、
+  `{:}`（空映射）、`_`（占位）。
+- 无八进制、无字符字面量、无字符串插值。
+
+## 4. 语法骨架
+
+```ebnf
+unit      = "package" IDENT { use } { item }
+item      = { attr } [ "pub"|"priv"|"prot" ] ( fn | type | class | trait | impl
+          | mod | static | extern | macro | attr-decl | section | let | var )
+fn        = [ "comptime" | "irq" ] "fn" IDENT [ generics ] "(" params ")"
+            [ "->" type ] [ "where" bounds ] ( block | "=>" expr )
+class     = "class" IDENT [ "extends" type ] "{" { field | fn } "}"
+impl      = "impl" [ type "for" ] type "{" { fn } "}"
+stmt      = let | var | assign | if | while | loop | for | break | continue
+          | return | goto | send | assert | block | try-block | expr
+expr      = assign | pipe ;  pipe = or { "|>" or }
+```
+
+表达式优先级（高→低）：后缀 `. [] ()` → 一元 `- ! ~ & *` + 前缀关键字（`try recv sizeof alignof typeinfo comptime`）
+→ `as` → `* / %` → `+ -` → `<< >>` → `< > <= >= is in` → `== !=` → `&` → `^` → `|` → `&&` → `||` → `|>` → `=`（仅语句层）。
+
+## 5. 语义要点
+
+- **类型**：`i8..i128` `u8..u128` `isize` `usize` `f32` `f64` `bool` `str` `unit`；无隐式数值转换（用 `as`）。
+- **内存**：值默认栈/静态；堆必须显式选 `alloc`+`free`、`rc[T]`、`arc[T]`（`--gc` 开启时）或 `gc[T]`；
+  `ref` 是受检借用（同时 1×`ref mut` 或 N×`ref`），`ptr`/`raw` 是 `@unsafe` 逃逸口。
+- **析构**：离开作用域/引用计数归零时确定性调用 `drop`；`drop` 内禁止 `panic`。
+- **错误**：可恢复错误用 `res[T,E]`/`opt[T]` + `try`/`catch`；不可恢复用 `panic`（`--bare` 恒 abort）；
+  `assert` 只查不变量。
+- **并发**：`spawn` 结构化（作用域结束自动 `wait`）、`go` 分离、`thread` 独占 OS 线程；
+  共享可变状态只能经 `mutex`/`chan`。
+- **裸机**：`@` 属性前缀 + `asm`/`volatile`/`at`/`irq`/`section`/`packed`；`@unsafe { }` 不安全块。
+- **元编程**：`macro`（解析期语法）→ `comptime`（编译期求值）→ `typeinfo`（类型反射）→ `attr`（自定义属性）。
+- **OOP**：`class` 单继承 + `extends`/`super`；`trait`/`impl`/`dyn` 负责接口与动态派发。
+
+## 6. 关键消歧（必须记住）
+
+1. `{}` 是空块，`{:}` 是空映射；`{k:v}` 是映射。**0.1 没有结构体字面量**：值类型用 `名(字段: 值)` 构造，类用 `类.new(...)`。
+2. 泛型/数组用 `[]`：`Vec[T]`、`res[T,E]`、`[]u8`、`[u8; 4]`。
+3. 三个箭头：`->` 类型（返回/函数类型）、`=>` 值（match 分支/单表达式函数体）、`|>` 表达式管道。
+4. `let` 不可变，`var` 可变；不存在 `let mut`。
+5. `mut` 只修饰借用/指针/接收者：`ref mut T`、`ptr mut T`、`mut self`。
+6. `@` 只能跟属性名或 `{`（`@unsafe {`）；`@at(...)`、`@section(...)`、`@irq(n)` 是属性形式。
+7. `use a.b as c`、`use a.b.{x, y}`；路径用 `.` 分隔。
+8. `match` 必须穷尽，`_` 兜底；`when` 是守卫；`is` 可在 `if` 中绑定：`if x is Circle(c) { }`。
+9. `for 模式 in 可迭代`；无 range 语法糖，整数区间用 prelude `range(a,b)`。
+10. `goto 标签` 只在同函数内，标签写作 `标签:`；不可跨函数。
+
+## 7. dscc 编译驱动
+
+```
+dscc input.ds -o out --app|--bare --target <triple> --opt 0|1|2|3|s|z \
+     --gc none|rc|arc|tracing --rt none|minimal|full
+```
+
+| 选项 | 默认（app / bare） |
+|---|---|
+| `--gc` | `tracing` / `none`（bare 只允许 none） |
+| `--rt` | `full` / `minimal`（bare 不允许 full） |
+| `--opt` | `2` |
+| `--target` | 宿主；bare 目标如 `thumbv7em-none-eabi`、`riscv32-unknown-none-elf` |
+
+退出码：0 成功 / 1 编译或运行错误 / 2 用法错误 / 3 ICE / 4 链接不可用。
+
+## 8. 黄金示例
+
+```ds
+package hello
+
+fn main() {
+    let who = "Ds"
+    println("hello, " + who)
+}
+```
+
+```ds
+package demo
+
+fn fib(n: i32) -> i32 {
+    if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
+}
+
+fn main() {
+    for i in range(0, 10) {
+        println(str(fib(i)))
+    }
+}
+```
+
+```ds
+package demo
+
+type Point { x: f32, y: f32 }
+
+impl Point {
+    fn length(ref self) -> f32 {
+        math.sqrt(self.x * self.x + self.y * self.y)
+    }
+}
+
+fn main() {
+    let p = Point(x: 3.0, y: 4.0)
+    println(p.length())          // 5.0
+}
+```
+
+```ds
+package demo
+
+class Animal {
+    name: str
+    fn new(name: str) { self.name = name }
+    fn speak(self) -> str { "..." }
+}
+class Dog extends Animal {
+    fn new(name: str) { super.init(name) }
+    fn speak(self) -> str { "woof" }
+    drop(self) { println("bye " + self.name) }
+}
+fn main() {
+    let d = Dog.new("rex")
+    println(d.speak())           // woof
+}
+```
+
+```ds
+package demo
+
+fn parse(s: str) -> res[i32, error] {
+    if s == "" { return err(error("empty")) }
+    ok(len(s))
+}
+
+fn main() {
+    let v = try parse("abc")
+    match v {
+        n when n > 0 => println("ok"),
+        _ => println("bad"),
+    }
+    try { panic "boom" } catch panic { println("recovered") }
+}
+```
+
+```ds
+package demo
+
+fn main() {
+    let xs = [1 2 3 4]
+    let m = {"a": 1, "b": 2}
+    println(xs |> len)            // 4
+    println(m["b"])               // 2
+}
+```
+
+```ds
+package firmware
+# 裸机：dscc --bare --target thumbv7em-none-eabi
+section ".boot" {
+    fn reset() at 0x0000_0000 {
+        loop { @unsafe { asm "wfi" } }
+    }
+}
+packed type Header { magic: u16, len: u32 }
+@irq(5) irq fn tick() { }
+```
+
+## 9. 常见错误
+
+- 用 `class` 的 `T(...)` 构造 → 错；类用 `T.new(...)`。
+- 在 `match` 分支写表达式而不写 `=>` → 错。
+- 泛型写 `<T>` → 错，用 `[T]`。
+- 用 `let mut x` → 错；可变绑定用 `var x`。
+- 把 `#| ... |#` 当普通注释且不闭合 → 词法错误。
+- 期望 `{}` 是映射 → 错，空映射是 `{:}`。
+
+## 10. 如何验证
+
+```bash
+python3 tools/ds_keywords.py check --json spec/keywords.json   # 关键词表完整性
+python3 -m unittest discover -s tests                           # 参考驱动测试
+./dscc examples/tour.ds                                        # 跑示例
+```
+
+
+## 3. 完整规范
+
+# Ds v0.1 语言规范
+
+> **文档状态**：草案（Definition-only，尚无参考实现与可执行语义）
+> **版本**：0.1.0 ｜ **发布日期**：2026-11-13
+> **关键字冻结**：**77 项** = 73 个标识符式硬关键字 + 4 个符号式硬关键字（`@` `->` `=>` `|>`）
+> **一句话**：Ds 是一门静态类型、显式内存、可裸机运行、编译期可元编程的系统级语言。
+
+---
+
+## 0. 定位与契约
+
+### 0.1 定位
+
+Ds 面向"同一份源码可下沉到裸机、可上浮到带 OS 的应用"的场景。它不追求语法最小化，而追求**语义可预测**：内存、析构、错误、并发、代码布局都在源码里显式可见。
+
+### 0.2 十条设计契约
+
+| # | 契约 | 含义 |
+|---|---|---|
+| D1 | 关键字冻结 | 全部保留字 77 项，一次性冻结；0.1 不引入上下文关键字歧义 |
+| D2 | 静态类型 | 全量类型检查；无隐式数值转换；`as` 是唯一的显式转换 |
+| D3 | 显式内存 | 默认栈/静态存储；堆必须显式选择 `alloc` / `rc` / `arc` / `gc` 之一 |
+| D4 | 确定性析构 | 离开作用域即调用 `drop`；`--gc` 不影响栈与 `rc`/`arc` 的确定性释放 |
+| D5 | 错误分层 | 可恢复错误走 `res`/`opt`+`try`；不可恢复走 `panic`；`assert` 只用于不变量 |
+| D6 | 结构化并发 | `spawn` 有作用域与自动等待；`go` 是唯一的逃逸口；共享可变状态只能经 `mutex`/`chan` |
+| D7 | 裸机优先 | `--bare` 下无 OS、无 GC、无隐式分配；`@` / `asm` / `volatile` / `irq` / `section` / `packed` / `at` 提供硬件可见性 |
+| D8 | 编译期即一等公民 | `comptime` 求值、`macro` 语法展开、`typeinfo` 反射、`attr` 自定义属性 |
+| D9 | 单一继承 + trait | `class`/`extends` 负责实现复用与虚派；`trait`/`impl`/`dyn` 负责接口与多态 |
+| D10 | 一个包一次编译 | 一个 `dscc` 调用只编译一个 `package`；跨包复用经 `use`/`export` 与包管理器 |
+
+### 0.3 编译单元
+
+- 每个编译单元是一个源文件，第一行必须是 `package 名`。
+- 文件内可用 `mod` 声明子模块：内联块，或引用同目录下 `<名>.ds`。子模块目录为 `<名>/mod.ds`。
+- 名字空间层次：`package` → `mod` → 项。无 `lib`/`bin` 区分，产物形态由 `dscc --app` / `--bare` 决定。
+- 顶层语句只允许声明（`fn`/`let`/`var`/`type`/`class`/`trait`/`impl`/`mod`/`static`/`extern`/`macro`/`attr`/`section`/`use`/`export`）。
+
+---
+
+## 1. 词法
+
+### 1.1 标识符
+
+- 形态：`[A-Za-z_][A-Za-z0-9_]*`。
+- `_` 单独出现是空白占位符（见 §3.10），不构成标识符。
+- 原始标识符：`` `名` ``（反引号包裹）绕过关键字保留，仅供 FFI 与外部符号对齐使用，如 `` `free` ``。原始标识符不参与 `typeinfo` 名字输出中的转义。
+- 标识符区分大小写；前缀 `_` 表示"有意未使用"（不触发未使用警告）。
+
+### 1.2 空白、换行与语句终止
+
+- 空白（空格、制表、换行）分隔记号，不产生语义（除语句终止）。
+- **换行终止语句**；`;` 与换行等价，可显式书写。
+- 续行：行尾为运算符、`,`、`(`、`[`、`{`、`=>`、`=`、`->`、`|>`、`when`、`where`、`in` 时，下一行视为同一语句。
+- 块一律用 `{}` 界定，缩进不参与语法。
+
+### 1.3 全量关键词表
+
+计数口径：**77 项**。其中字母关键字 73 项（可作为声明/语句/表达式/类型/模式的关键词），符号关键字 4 项（`@` `->` `=>` `|>`）。**全部为硬关键字**：不能用作标识符、字段名、方法名、模块名或泛型参数名；如需对齐外部符号请用原始标识符 `` `名` ``。
+
+<!-- KEYWORDS:BEGIN -->
+
+### 定义（9）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `fn` | `fn 名[T](参数) -> 返回类型 { ... }`；类型位置写 `fn(参数) -> 返回类型` | 声明函数/方法、或书写函数类型值；函数体为块或 `=>` 单表达式；无默认参数、无重载（重载由 trait + 泛型表达） | `fn add(a: i32, b: i32) -> i32 { a + b }` |
+| `let` | `let 名: 类型 = 表达式` | 不可变绑定：只初始化一次，此后不可赋值、不可取 `ref mut`；类型可省略由初始化表达式推断 | `let pi = 3.14159` |
+| `var` | `var 名: 类型 = 表达式` | 可变绑定：可多次赋值；赋值目标必须是可写位置（`var` 绑定、`*ptr`、字段、索引） | `var n = 0` 然后 `n = n + 1` |
+| `type` | `type 名[T] { 字段: 类型, ... }` 或 `type 别名 = 类型` | 定义值类型（结构体，按值传递、可栈分配）或类型别名；无继承；默认布局 `repr(Ds)`，可用 `@repr(C)`/`packed`/`@align(n)` 覆盖；实例用值构造语法 `名(字段: 值, ...)` 创建，也允许在 `impl` 中补充命名构造器 `new` | `type Point { x: f32, y: f32 }` |
+| `class` | `class 名 extends 基类 { 字段; 方法 }` | 定义类：引用语义（句柄即类名）、单继承、虚派、确定性析构；实例经 `new` 构造，离开作用域时句柄计数归零即 `drop` | `class Animal { fn speak(self) -> str { "..." } }` |
+| `trait` | `trait 名[T] { fn 方法(self) -> 类型 }` | 定义接口/约束：可含方法签名、默认方法、关联类型与常量；由 `impl` 实现，可装箱为 `dyn` | `trait Draw { fn draw(self) }` |
+| `impl` | `impl Trait for 类型 { ... }` 或 `impl 类型 { ... }` | 为类型实现 trait（孤儿规则：trait 或类型至少一个属于本包）或补充固有方法/关联函数块 | `impl Draw for Circle { fn draw(self) { ... } }` |
+| `mod` | `mod 名 { ... }` 或 `mod 名` | 声明子模块：内联块或外部 `<名>.ds`；模块是名字空间与可见性边界，也是 `use` 路径的一段 | `mod net { pub fn get() {} }` |
+| `package` | `package 名` | 包声明，必须是编译单元第一行；一次 `dscc` 调用编译一个包；包名即根模块名，也是 `typeinfo` 中类型的限定前缀 | `package myapp` |
+
+### 控制（9）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `if` | `if 条件 { } else if 条件 { } else { }` | 条件分支，同时是表达式：所有分支的值类型必须一致；条件是 `bool`，无隐式真值转换 | `let m = if a > b { a } else { b }` |
+| `else` | `else { ... }` 或 `else if ...` | 与最近的未配对 `if` 结合；`else` 后必须是块或另一个 `if`；`if` 作语句且无 `else` 时值为 `unit` | `if ok { } else { }` |
+| `loop` | `loop { ... }` | 无限循环；只能由 `break`/`return`/`goto`/`panic` 离开；`break 表达式` 使 `loop` 作为表达式产出该值 | `let n = loop { break 42 }` |
+| `while` | `while 条件 { ... }` | 前置条件循环：每轮先求值条件；仅接受 `bool`；条件中的借用不得跨轮次逃逸 | `while n < 10 { n = n + 1 }` |
+| `for` | `for 模式 in 可迭代 { ... }` | 迭代循环：可迭代值为数组、切片、映射、通道、迭代器；每轮对元素做模式解构并（默认）以 `ref` 借用；无 range 语法糖，整数区间用 prelude `range(a, b)` | `for x in [1 2 3] { }` |
+| `break` | `break` 或 `break 表达式` | 跳出最近一层循环；带值时该值成为外层 `loop` 表达式的值；只能在循环体内 | `break 42` |
+| `continue` | `continue` | 结束当前轮、进入下一轮；只能在循环体内 | `continue` |
+| `return` | `return` 或 `return 表达式` | 从当前函数返回；函数尾表达式是隐式返回值，因此可省略 `return`；返回类型 `-> !` 表示发散 | `return x` |
+| `goto` | `goto 标签` | 同函数内无条件跳转：目标由语句 `标签:` 声明；禁止跨函数、禁止跳入 `try`/`match` 分支/循环体内部、禁止跳过带析构的绑定；标签在优化后可能消失但语义不变 | `goto retry` |
+
+### 管道（3）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `->` | `fn f(..) -> 返回类型`；类型位置 `fn(A) -> B` | 类型层的"指向/产出"箭头：声明返回类型、书写函数类型、`-> !` 表示发散（永不返回）；不参与表达式运算 | `fn f() -> ! { panic "never" }` |
+| `=>` | `模式 => 表达式`；`fn(参数) => 表达式` | 值层的"产出"箭头：`match` 分支体、单表达式函数体、匿名函数体；与 `->` 分工——`->` 管类型，`=>` 管值 | `match x { 0 => "zero", _ => "other" }` |
+| `\|>` | `值 \|> 函数` | 管道运算符（左结合）：`a \|> f \|> g` 等价 `g(f(a))`；右侧为函数值时展开为调用，为 `fn` 字面量时等价直接调用；只做语法降糖，不改变求值顺序（仍从左到右求值操作数） | `s \|> parse \|> validate` |
+
+### 错误（7）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `try` | `try 表达式`；`try { ... } catch e { ... }` | 两种形式：① `try e`——`e: res[T, E]`，`ok` 时取出 `T`，`err` 时立即 `return err(e)`（所在函数必须返回 `res`）；② try 块——捕获块内普通错误与 `panic`，交给 `catch` 处理 | `let v = try parse(s)` |
+| `catch` | `catch e { ... }`；`catch panic p { ... }` | 捕获普通错误（`e: E`）或 `panic` 载荷（`p` 可省，用 `recover` 取）；`catch` 块是表达式，其值即 `try` 表达式的值；未捕获的 `panic` 向上传播 | `try { f() } catch e { log(e) }` |
+| `panic` | `panic 表达式` | 不可恢复错误：`--app` 下默认展开栈并中止进程，可被外层 `catch panic` 捕获；`--bare` 下恒为 `abort`（无展开运行时）；`panic` 载荷类型为 prelude `error` 的扩展 | `panic "out of memory"` |
+| `recover` | `recover` | 仅在 `catch panic` 块内合法：返回被 `panic` 抛出的载荷；在其他位置出现是编译错误；不恢复寄存器，只取载荷 | `try { g() } catch panic { log(recover) }` |
+| `assert` | `assert 条件, "消息"` | 断言语句：条件必须是 `bool`，失败走 `panic(AssertFailed)`；`comptime` 上下文中静态求值，失败即编译错误；`--opt >= 2` 保留失败路径与消息 | `assert n < 1024, "overflow"` |
+| `res` | `res[T, E = error]` | 内建结果类型：`ok(T)` / `err(E)`；`try`/`catch` 的操作对象；与 prelude `error` trait 配合 | `fn parse(s: str) -> res[i32, error]` |
+| `opt` | `opt[T]` | 内建可选类型：`some(T)` / `none`；`opt[ptr[T]]`、`opt[rc[T]]` 保证与指针同宽（空指针优化）；与 `res` 互转用 std `ok_or`/`ok` | `fn find(xs: []i32) -> opt[i32]` |
+
+### 模块（8）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `use` | `use 路径 [as 别名]`；`use 路径.{a, b}` | 导入名字到当前作用域；路径用 `.` 分隔；未使用导入是警告；不可导入 `priv` 项；`use` 不产生运行时代码 | `use net.http as http` |
+| `as` | `use a as b`；`表达式 as 类型` | 双用途：导入/导出/模式绑定别名；显式类型转换（总是成功，位级语义——数值截断与扩展、整数↔浮点、指针重解释、trait upcast）；受检转换用 prelude `try_from` | `let a = x as u32` |
+| `export` | `export 项, 项`；`export mod.api` | 重导出：把子模块中的项提到包对外 API 表；被 `export` 的项即使定义在 `priv` 模块也对包外可见 | `export net.http` |
+| `pub` | `pub 项` | 公开可见：跨包可用，属于包 ABI 的一部分；`pub` 类型的 `pub` 字段才是外部可写 | `pub fn api() {}` |
+| `priv` | `priv 项` | 私有可见：仅当前模块可见；这是**默认**可见性，显式书写用于审计与意图表达 | `priv fn helper() {}` |
+| `prot` | `prot 项` | 包内可见：本包及子模块可见、包外不可见（包级保护）；0.1 不提供子类可见性 | `prot static VERSION: u32 = 1` |
+| `static` | `static 名: 类型 = 常量`；`static mut`；`impl T { static fn f() }` | 静态存储项（地址稳定、程序生命周期、必须常量初始化）或静态方法；`static mut` 可写但访问需 `@unsafe` 或经原子/`mutex`；`@at`/`at` 可固定地址 | `static mut COUNTER: u32 = 0` |
+| `extern` | `extern "ABI" fn 名(..) -> 类型`；`extern { ... }` | FFI：声明无函数体的外部符号并指定 ABI（`"C"`/`"sysv"`/`"fastcall"`）；调用外部函数隐式处于 `@unsafe` 上下文；`extern` 块可批量声明 | `extern "C" fn puts(s: str) -> i32` |
+
+### 并发（8）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `spawn` | `spawn { ... }`；`spawn f(args)` | 结构化并发：在当前任务组内启动任务并返回 `task[T]`；离开作用域时自动 `wait` 全部任务并传播首个错误/panic；任务组同时是取消边界 | `spawn { work() }` |
+| `go` | `go f(args)` | 分离式启动：不登记到当前作用域、不自动等待，进程退出时被强制中止；必须用 `chan`/`wait`/`mutex` 显式同步，否则是数据竞争风险点 | `go worker(ch)` |
+| `thread` | `thread(函数)`；类型位置 `thread` | 创建独占 OS 线程（1:1 映射）并返回 `thread` 句柄；`spawn`/`go` 默认跑在共享线程池，`thread` 用于长时间阻塞 FFI 或实时任务 | `let t = thread(realtime_loop)` |
+| `chan` | `chan[T]`；`chan[T](容量)` | 通道类型构造：默认无缓冲（同步交接），`chan[T](n)` 为有界缓冲；关闭用 `ch.close()`；关闭后 `recv` 得 `none` | `let ch = chan[i32](32)` |
+| `send` | `send 通道, 值` | 发送语句/表达式：无缓冲时阻塞直到有接收方；缓存满时阻塞；通道已关闭时失败，返回 `res[unit, error]`（可忽略） | `send ch, 42` |
+| `recv` | `recv 通道` | 接收表达式：有值返回 `some(v)`，通道关闭且已空返回 `none`；无值且未关闭时阻塞 | `let v = recv ch` |
+| `mutex` | `mutex[T]`；`mutex(值)` | 内建互斥锁：`lock()` 返回守卫，守卫离开作用域自动解锁；是跨线程共享可变状态的唯一安全通道，通常与 `arc` 组合；`--bare` 下必须用无 OS 的自旋实现 | `let m = mutex(0)` |
+| `wait` | `wait 句柄`；`wait 任务组` | 等待 `task`/`thread`/等待组完成并取回结果；返回 `res[T, error]`（任务 panic 转成 `err`）；被取消的任务在 `wait` 处返回 `err(Cancelled)` | `let r = wait t` |
+
+### 内存（9）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `raw` | 类型位置 `raw` | 无类型、无对齐信息、非拥有的字节地址（对应 C `void*`）：不可解引用、不可算术，只能 `as` 转换或传给 `extern`；是 FFI 与分配器的边界类型 | `extern "C" fn memset(p: raw, c: u8, n: usize) -> raw` |
+| `free` | `free 指针` | 释放 `alloc` 获得的块；对非 `alloc` 来源释放是未定义行为（编译期可判定则报错）；释放后指针失效，不置空 | `free(p)` |
+| `alloc` | `alloc(字节数, 对齐) -> ptr[u8]` | 从当前分配器分配未初始化裸块（不构造值、不调 `drop`）；`--bare` 下必须先注册分配器（`@allocator`），否则链接错误 | `let p = alloc(64, 8)` |
+| `rc` | `rc[T]`；`rc(值)` | 非原子引用计数智能指针：`clone()` 增计数，最后一份释放时按要求调用 `drop`；`!Send`，不可跨线程 | `let a = rc(Point(x: 1, y: 2))` |
+| `arc` | `arc[T]`；`arc(值)` | 原子引用计数智能指针：`T: Send + Sync` 时整体 `Send + Sync`；跨线程共享所有权，通常包 `mutex` 使用 | `let a = arc(mutex(0))` |
+| `gc` | `gc[T]`；`gc(值)` | GC 托管的堆对象：仅当 `--gc` 不为 `none` 且处于 `--app` 模式可用；`--bare` 下使用是编译错误；GC 对象不参与确定性析构（`drop` 至多调一次） | `let node = gc(Node(next: none))` |
+| `ptr` | `ptr[T]`；`ptr mut T` | 带类型原始指针：解引用需 `@unsafe`；`ptr + 整数` 运算需 `@unsafe`；可空性用 `opt[ptr[T]]`；不参与借用检查，不与 `ref` 混用 | `@unsafe { let v = *p }` |
+| `ref` | `ref T`；`ref mut T` | 借用引用（非拥有）：受所有权与别名规则约束（同一时刻 1×`ref mut` 或 N×`ref`）；宽度同指针；不能逃逸出被借用值的生命周期 | `fn len(s: ref [i32]) -> usize` |
+| `mut` | `ref mut T`；`ptr mut T`；`mut self`；`mut 参数` | 可变性修饰：只用于借用、指针与接收者，表示"可写视图"；变量本身的可变性由 `var` 声明，因此不存在 `let mut` 写法 | `fn clear(mut self) { }` |
+
+### 裸机（7）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `@` | `@属性`；`@属性(参数)`；`@属性 { ... }` | 属性/注解前缀，可作用于项、语句、类型与表达式；内建属性：`@inline` `@no_mangle` `@entry` `@section("..")` `@at(地址)` `@irq(向量)` `@repr(C)` `@packed` `@align(n)` `@volatile` `@unsafe` `@allocator`；`@unsafe { }` 是**不安全块**（解引用 `ptr`、`asm`、访问 `static mut`、`volatile` 读写、`goto` 目标校验之外的指针算术必须位于其中）；`attr` 声明的自定义属性同样以 `@` 使用 | `@inline fn hot() {}` |
+| `asm` | `asm "模板"`；`asm { "模板", out(..), in(..), clobber("..") }` | 内联汇编：必须位于 `@unsafe` 上下文；`asm` 可作为表达式产出寄存器值（`out` 绑定）；模板原样交给目标汇编器，不做转义；`--bare` 下始终可用，`wasm` 目标下是编译错误 | `@unsafe { asm "nop" }` |
+| `volatile` | 类型位置 `volatile 类型`；属性 `@volatile` | 易失访问修饰：作用于 `ptr`/`raw`，读写不可被优化、合并、消除或重排；用于 MMIO 寄存器；对非指针类型使用是编译错误 | `let reg: volatile ptr[u32] = 0x4000_0000 as volatile ptr[u32]` |
+| `at` | 项声明尾部 `... at 常量地址`；等价属性 `@at(常量地址)` | 地址放置子句：把 `static`/`fn` 放到固定地址（由链接脚本转成段+偏移）；只允许常量地址；与 `--bare` 配合 | `fn reset() at 0x0000_0000 { }` |
+| `irq` | `irq fn 名(参数) { ... }`；配合 `@irq(向量号)` | 声明中断服务例程：dscc 生成上下文保存/恢复与中断返回序列；ISR 内禁止阻塞原语（`wait`/`recv`/`send`/`mutex.lock`）；向量号用 `@irq(n)` 绑定或由中断表 `@irq_table` 统一注册 | `@irq(5) irq fn timer_tick() { }` |
+| `section` | `section "段名" { 项... }` | 段放置块：块内所有项进入指定链接段（`.boot`/`.text`/`.rodata`/`.bss` 等）；段名原样交给链接器；`--app` 下同样生效（自定义段） | `section ".boot" { fn _start() { } }` |
+| `packed` | `packed type 名 { ... }`；等价属性 `@packed` | 紧凑布局：无填充，`alignof(T) == 1`（除非另加 `@align(n)`）；非对齐字段访问由 dscc 生成逐字节序列，或按目标能力产出单指令 | `packed type Header { magic: u16, len: u32 }` |
+
+### 元编程（4）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `comptime` | `comptime 表达式`；`comptime { ... }`；`comptime fn`；`comptime if`/`comptime for` | 编译期求值域：内部代码在编译期执行，结果内联；`comptime fn` 可在类型、常量、宏与布局属性中调用；`comptime if` 分支在编译期选定，未选分支不参与类型检查；块内禁止 `asm`/`extern`/I/O | `comptime if sizeof(T) > 8 { ... }` |
+| `macro` | `macro 名(参数: 语法片段) { 模板 }` | 语法宏：解析期展开、默认卫生（模板内新标识符不与调用点冲突）；片段类型为 `expr`/`type`/`pat`/`stmt`/`block`/`ident`/`lit`；与 `comptime fn` 分工——`macro` 操作语法，`comptime fn` 操作值/类型 | `macro unless(c: expr, b: block) { if !c { b } }` |
+| `typeinfo` | `typeinfo(类型)`；`typeinfo::of(表达式)` | 编译期类型反射：返回 `TypeInfo`（字段 `name`/`size`/`align`/`fields`/`traits`/`kind`）；`comptime` 中完全可用；运行期保留需 `--rt full`，否则是编译错误 | `comptime let n = typeinfo(T).name` |
+| `attr` | `attr 名(目标: 属性目标) { 参数... }` | 声明自定义属性：目标 ∈ `fn`/`type`/`class`/`field`/`static`/`mod`/`stmt`/`expr`；声明后以 `@名(参数)` 使用；属性值由 `comptime` 代码读取，编译器不解释语义 | `attr doc(target: fn) { text: str }` |
+
+### OOP（6）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `self` | `self`；`ref self`；`mut self`；`self.字段`；`self.方法()` | 方法接收者：`class`/`impl` 方法的隐式首参，不可重命名、不可作自由变量；`mut self` 表示可变借用接收者；`class` 的 `self` 是引用语义，`type`/`impl` 的 `self` 是值语义（可 `ref` 借用） | `fn area(self) -> f32 { self.w * self.h }` |
+| `super` | `super.方法(参数)`；`super.init(参数)` | 访问父类实现：仅 `class ... extends` 内部合法；用于调用被覆盖的方法或基类构造器；不可作为值传递、不可跳级 | `super.init(name)` |
+| `new` | `new(参数) { ... }`；`类型.new(参数)` | 构造器：`class` 体内的 `new` 声明构造逻辑并返回实例，外部写 `类型.new(...)`，必须直接或经 `super.init` 初始化基类；`type` 的默认构造是值构造 `名(字段: 值, ...)`，`impl` 中的 `new` 是额外命名构造器（同样以 `类型.new(...)` 调用） | `let p = Point(x: 1, y: 2)` |
+| `drop` | `drop(self) { ... }` | 析构器：值离开作用域、容器销毁或 `rc`/`arc` 计数归零时确定性调用一次；执行后字段按声明逆序销毁；析构器内不可 `panic`（编译错误） | `drop(self) { free(self.buf) }` |
+| `extends` | `class 子类 extends 父类 { ... }` | 单继承子句：一个类至多一个父类；继承字段、方法与虚派表；接口组合用 `impl trait for class`，不支持多继承 | `class Dog extends Animal { }` |
+| `dyn` | `dyn Trait` | 动态派发 trait 对象类型（两字宽胖指针：数据指针 + vtable）；`dyn` 值必须经 `ref`/`rc`/`arc`/`gc` 持有；由实现值经 `as dyn Trait` 装箱得到 | `let d: rc[dyn Draw] = rc(Circle.new()) as rc[dyn Draw]` |
+
+### 模式（7）
+
+| 词 | 形式 | 语义 | 示例 |
+|---|---|---|---|
+| `match` | `match 表达式 { 模式 => 分支, ... }` | 模式匹配表达式：分支须穷尽（`_` 兜底）；按书写顺序试探，`when` 守卫不满足则继续下一分支；分支体可为块 | `match o { some(v) => v, none => 0 }` |
+| `when` | `模式 when 条件 => 分支` | 匹配守卫：模式绑定成功后求值条件，为真才采用该分支；守卫中可见模式绑定变量；只出现在 `match` 分支中 | `n when n % 2 == 0 => "even"` |
+| `where` | `fn f[T](..) where T: Trait + Trait2 { }` | 泛型约束子句：在参数表之后、返回类型/函数体之前声明 trait 约束与生命周期约束；可用于 `fn`/`impl`/`type`/`trait` | `fn show[T](x: T) where T: Draw { }` |
+| `in` | `for 模式 in 可迭代`；`表达式 in 容器` | 双用途：`for` 头的迭代子句；表达式位置的成员测试（数组/切片/映射），返回 `bool` | `if key in map { }` |
+| `is` | `表达式 is 类型`；`表达式 is 模式(绑定)` | 类型/模式测试表达式，返回 `bool`；`if x is Circle(c) { }` 在真分支把 `c` 绑定为解构结果；右操作数必须是类型或模式 | `if v is u32 { }` |
+| `sizeof` | `sizeof(类型)`；`sizeof(表达式)` | 编译期常量（`usize`）：类型的字节大小；传表达式时取其静态类型；泛型中按单态化后的实际类型求值 | `comptime let n = sizeof(u64)` |
+| `alignof` | `alignof(类型)` | 编译期常量（`usize`）：类型的最小对齐；`packed` 类型为 1；可与 `@align(n)` 组合推导 | `@align(alignof(u64))` |
+
+<!-- KEYWORDS:END -->
+
+### 1.4 内建名（prelude，不是关键字）
+
+以下名字由 prelude 预导入，**不是关键字**，可被同名项遮蔽（产生警告）。它们不出现在 §1.3 的 77 项中。
+
+- **基础类型**：`i8` `i16` `i32` `i64` `i128` `u8` `u16` `u32` `u64` `u128` `isize` `usize` `f32` `f64` `bool` `str` `bytes` `unit` `never`。
+- **函数类型/特殊类型**：`fn` 已是关键字；`task[T]`、`thread`（关键字）之外不新增。
+- **构造器与常量**：`true` `false` `none` `some` `ok` `err` `unit`。
+- **核心 trait**：`Eq` `Ord` `Hash` `Default` `Clone` `Copy` `Send` `Sync` `Drop` `Display` `Error` `Into` `TryFrom`。
+- **内建对象**：`range(a, b)`（整数半开区间，`for` 用）、`error`（默认错误类型）、`AssertFailed`、`Cancelled`。
+- **常用函数**：`print`、`println`、`format`、`concat`、`len`、`str`、`abs`、`pow`（均可被同名项遮蔽）。
+- **内存相关**：`allocator`（分配器接口）、`atomic[T]`、`spinlock`（`--bare` 的 `mutex` 后端）。
+
+### 1.5 硬关键字、原始标识符与未来保留
+
+- 77 项全部为**硬关键字**：任何位置都不可作为标识符；若必须与外部符号同名，使用原始标识符 `` `名` ``。
+- 反引号内的名字不参与关键字判定，`typeinfo` 输出的名字会去掉反引号并标记 `escaped: true`。
+- 0.1 **不保留**以下常见词，它们仍是合法标识符：`struct` `enum` `union` `const` `defer` `yield` `async` `await` `unsafe` `interface` `namespace` `typeof` `static_assert` `do` `to` `until` `pub(crate)`。其中 `struct`/`enum`/`const`/`defer`/`async`/`await` 计划在 0.2 升格为关键字，届时通过 `dscc --edition` 迁移。
+
+---
+
+## 2. 运算符
+
+### 2.1 全量运算符表
+
+共 26 个运算符记号（含 1 个符号关键字 `->` 的运算位置用法、1 个符号关键字 `=>`；其余为纯运算符）。`@` 为属性前缀、`_` 为占位符，均不参与运算。
+
+<!-- OPERATORS:BEGIN -->
+
+| 运算符 | 元数 | 含义 | 说明 |
+|---|---|---|---|
+| `+` | 二元/一元 | 加法 / 一元取正 | 数值相加；`str + str` 拼接（结果分配，`--bare` 下用 std `concat`）；指针加偏移需 `@unsafe` |
+| `-` | 二元/一元 | 减法 / 一元取负 | 无常量折叠差异；`-3` 是一元运算作用于字面量，见 §3.2 |
+| `*` | 二元/一元 | 乘法 / 一元解引用 | 解引用仅对 `ptr[T]` 合法，且必须位于 `@unsafe` |
+| `/` | 二元 | 除法 | 整数除法向零截断；除数为 0 时运行期 `panic`（`--opt` 不消除检查） |
+| `%` | 二元 | 取余 | 结果符号随被除数；除数为 0 时 `panic` |
+| `=` | 二元 | 赋值 | 右结合；左侧必须是可写位置；只能作为语句（或 `let`/`var`/字段初始化的一部分），不能作为子表达式参与运算 |
+| `==` | 二元 | 相等 | 要求实现 `Eq`；非结合（`a == b == c` 需显式括号） |
+| `!=` | 二元 | 不等 | 同 `==` |
+| `<` | 二元 | 小于 | 要求实现 `Ord`/`PartialOrd`；非结合；不可链式比较 |
+| `>` | 二元 | 大于 | 同上 |
+| `<=` | 二元 | 小于等于 | 同上 |
+| `>=` | 二元 | 大于等于 | 同上 |
+| `!` | 一元 | 逻辑非 | 仅 `bool`；不是位取反（位取反是 `~`） |
+| `&&` | 二元 | 短路与 | 左操作数为 `false` 时不求值右操作数；仅 `bool` |
+| `\|\|` | 二元 | 短路或 | 左操作数为 `true` 时不求值右操作数；仅 `bool` |
+| `&` | 二元/一元 | 按位与 / 取地址 | 一元 `&e` 得 `ptr[T]`（可写位置得 `ptr mut T`）；`&`/`*` 是一对；按位与对整数逐位 |
+| `\|` | 二元 | 按位或 / 模式择一 | 整数逐位或；在模式位置 `1 \| 2 =>` 表示分支择一（模式层，不是表达式运算） |
+| `^` | 二元 | 按位异或 | 整数逐位异或；`a ^ a == 0` 不因优化改变（无副作用时仍可消除） |
+| `~` | 一元 | 按位取反 | 整数补码取反；仅整数 |
+| `<<` | 二元 | 左移 | 移位量 ≥ 位宽时运行期 `panic`；编译期已知则编译错误 |
+| `>>` | 二元 | 右移 | 无符号补 0、有符号算术右移；移位量规则同 `<<` |
+| `.` | 二元 | 成员/路径访问 | 表达式位置为字段/方法访问；路径位置为模块分隔（`use a.b`、`super.m`） |
+| `[]` | 后缀 | 索引 / 切片 / 泛型实参 | `xs[i]`、`xs[a:b]`；类型位置为泛型实参（`Vec[T]`、`[T; N]`、`[]T`） |
+| `\|>` | 二元 | 管道 | 左结合，最低的表达式运算符（仅高于赋值）；`a \|> f` 降糖为 `f(a)` |
+| `->` | 词法/类型 | 返回类型箭头 | 只出现在类型与声明位置；`-> !` 发散；不参与表达式优先级 |
+| `=>` | 词法/结构 | 分支/函数体箭头 | 只出现在 `match` 分支、单表达式函数体、匿名函数体；不参与表达式优先级 |
+
+<!-- OPERATORS:END -->
+
+### 2.2 优先级与结合性
+
+从高到低（同层内按结合性）：
+
+| 层 | 运算符 | 结合性 | 备注 |
+|---|---|---|---|
+| 1 | `()` 调用、`[]` 索引/切片、`.` 成员 | 左 | 后缀链 |
+| 2 | 前缀 `-` `!` `~` `&` `*`，以及前缀关键字 `try` `recv` `sizeof` `alignof` `typeinfo` `comptime` | 右 | `&mut e` 是可变取地址的合写（得 `ptr mut T`）；`*p.field` 读作 `*(p.field)` |
+| 3 | `as` | 左 | 类型转换，链式 `x as u32 as u64` 合法 |
+| 4 | `*` `/` `%` | 左 | |
+| 5 | `+` `-` | 左 | |
+| 6 | `<<` `>>` | 左 | 低于加减、高于比较（与 Go 一致） |
+| 7 | `<` `>` `<=` `>=` `is` `in` | 非结合 | 不可链式 |
+| 8 | `==` `!=` | 非结合 | |
+| 9 | `&` | 左 | 位与 |
+| 10 | `^` | 左 | 位异或 |
+| 11 | `\|` | 左 | 位或 |
+| 12 | `&&` | 左 | 短路 |
+| 13 | `\|\|` | 左 | 短路 |
+| 14 | `\|>` | 左 | 管道 |
+| 15 | `=` | 右 | 仅语句层，不出现在表达式内部 |
+
+`spawn`/`go`/`wait`/`send`/`mutex`/`chan`/`thread`/`alloc`/`free`/`rc`/`arc`/`gc` 属于**构造型关键字**，按前缀或调用语法解析，不参与上述优先级。
+
+### 2.3 歧义消解规则
+
+| # | 场景 | 规则 |
+|---|---|---|
+| R1 | `{` 是块还是映射 | 表达式位置中，`{` 后第一个记号是 `}`（空块）、`:`（空映射 `{:}`）、或项声明开头 → 按语法上下文判定；`{k: v}` 且 `k` 后紧跟 `:` → 映射字面量；其余 → 块。**空映射必须写 `{:}`**，空块写 `{}` |
+| R2 | `[` 是索引、数组字面量还是泛型 | 表达式位置：`[` 开头 → 数组字面量；`expr[` → 索引/切片。类型位置：`类型[` → 泛型实参或定长数组 |
+| R3 | `\|>` 与 `\|\|` | 词法最长匹配：先匹配 `\|\|`，再匹配 `\|>`，最后单 `\|` |
+| R4 | `->` / `=>` / `\|>` 分工 | `->` 只在类型与声明位置；`=>` 只在分支/函数体/匿名函数；`\|>` 只在表达式位置。三者不可互换 |
+| R5 | `#` 与 `#\|` | 先匹配 `#\|`（块注释开始），否则 `#` 是行注释 |
+| R6 | `-3` | 一元负号 + 字面量 `3`，允许无空格；字面量本身无符号；常量折叠在编译期完成 |
+| R7 | `@` 后接什么 | `@` 后只能跟属性名（关键字或标识符）或 `{`（`@unsafe {`）；`@unsafe { }` 是唯一"关键字+块"属性形式 |
+| R8 | `in` 的位置 | `for 模式 in ...` 中是迭代子句；其他表达式位置是成员测试；两者返回类型分别为"元素绑定"与 `bool` |
+| R9 | `when` 的位置 | 仅在 `match` 分支的模式与 `=>` 之间；其他位置是语法错误 |
+| R10 | `where` 的位置 | 仅在泛型参数表之后（`fn`/`impl`/`type`/`trait` 的约束子句） |
+| R11 | `标签:` 与映射/类型注解 | 语句起始处的 `标识符 :` 视为标签；`=` 右侧的 `标识符 :` 视为映射键；类型位置视为字段/参数注解 |
+| R12 | `at` 的位置 | 项声明尾部（`fn`/`static` 之后）是放置子句；`@at(...)` 是等价属性；其他位置是编译错误 |
+| R13 | `new` | 只出现在 `class` 体内的构造器声明、`impl` 中为 `type` 声明的命名构造器，以及 `类型.new(...)` 调用；不能作为自由函数名 |
+| R14 | `drop` | 只作为析构器声明（`class`/`type`/`impl` 内）；显式释放用 `free`，不提供 `drop x` 语句 |
+| R15 | `wait` / `send` / `recv` | `wait`/`recv` 是前缀表达式（可出现在赋值右侧）；`send` 是语句形式，两个操作数用 `,` 分隔 |
+| R16 | `名(字段: 值, ...)` | 若 `名` 是类型名 → 值类型构造；函数调用不接受命名实参，故不存在二义；`类型.new(...)` 专用于 `class`（必需）与 `type` 的自定义命名构造器 |
+
+---
+
+## 3. 字面量
+
+### 3.1 整数
+
+- 十进制：`5`、`0`、`1_000_000`（`_` 仅为可读分隔，值不变）。默认类型 `i32`；在需要 `usize` 的上下文（索引、长度、`sizeof` 实参）按上下文推断为 `usize`；类型无法推断且超出 `i32` 时报错，需显式标注。
+- 十六进制：`0xFF`、`0xDEAD_BEEF`（前缀 `0x`/`0X`，数字大小写不敏感）。
+- 二进制：`0b1010`、`0b1111_0000`（前缀 `0b`/`0B`）。
+- 八进制：**0.1 不提供**（避免 `0777` 歧义），用 `0o` 前缀为 0.2 候选。
+- 无类型后缀：`5u8` 这类后缀**不是** 0.1 语法；类型由上下文或显式标注 `let x: u8 = 5` 给出。
+
+### 3.2 负数
+
+`-3` 不是独立字面量，而是**一元负号作用于字面量**。`-3` 与 `- 3` 等价；在常量上下文（`static`、`comptime`、数组长度、`at` 地址）中由编译期折叠。写 `-0x80` 合法，表示对 `0x80` 取负，不按补码位模式解释。
+
+### 3.3 浮点
+
+0.1 必需补充（`f32`/`f64` 存在，须有字面量）：`3.14`、`1.0`、`1e9`、`1.5e-3`、`0x1p3`（十六进制浮点，指数为 2 的幂）。默认类型 `f64`；标注 `f32` 时按目标精度截断。无 `NaN`/`Inf` 字面量，用 prelude `f32.nan`/`f32.inf`。
+
+### 3.4 字符串
+
+- `"str"`：UTF-8 字面量，类型 `str`（不可变 UTF-8 视图，借用语义）。
+- 转义：`\n` `\r` `\t` `\\` `\"` `\0` `\xNN`（单字节）`\u{...}`（Unicode 标量）。
+- 不可含裸换行；需换行写 `\n`。
+- 无字符串插值（0.1 用 std `format`/`concat`）。
+- 字面量存放于 `.rodata`，零拷贝。
+
+### 3.5 原始字节串
+
+`b"raw"`：逐字节取源文件字节，**不做转义处理**；因此内容中不能出现 `"`，反斜杠按字面保留（`b"a\nb"` 是 5 个字节：`a` `\` `n` `b`）。类型 `[]u8`（只读静态切片），位于 `.rodata`；用于协议常量、MMIO 魔数、FFI 名称。
+
+### 3.6 数组字面量
+
+- `[1 2 3]`：元素以空白或 `,` 分隔，可尾随逗号；`[]` 是空数组（元素类型须由上下文推断）。
+- 类型：定长 `[T; N]` 或按上下文退化为切片 `[]T`；元素类型必须一致，无隐式提升。
+- 嵌套 `[[1 2] [3 4]]` 合法；无 `..` 展开语法（0.1 不支持 spread）。
+
+### 3.7 映射字面量
+
+- `{k:v}`：键值对以 `,` 或换行分隔（`:` 两侧允许空格，故 `{k:v}` 与 `{k: v}` 等价）；键类型须实现 `Eq + Hash`；同一字面量中重复键是编译错误。
+- 空映射写作 `{:}`（因为 `{}` 是空块，见 R1）。
+- 映射是**有序**的吗？0.1 定义：迭代顺序为实现定义，但同一映射在同一次运行内顺序稳定；需要顺序请用数组。
+- 键值分隔只能是 `:`，不提供 `=>` 形式的映射。
+
+### 3.8 布尔与可选值
+
+`true`/`false`、`none`、`some(v)`、`ok(v)`、`err(e)` 是 prelude 构造器/常量，**不是关键字**，可被遮蔽。
+
+### 3.9 类型标注字面量
+
+`let x: u8 = 5`；`5 as u8`；泛型实参 `Vec[u8]`。不存在 `5u8` 后缀。
+
+### 3.10 下划线 `_`
+
+`_` 是空白占位符（不是标识符、不是关键字），语义按位置而定：
+
+| 位置 | 含义 |
+|---|---|
+| 模式位置 | 通配：匹配任意值且不绑定 |
+| `_ = 表达式` | 丢弃赋值：求值后丢弃（不调用 `drop` 的差异见 §6.3） |
+| 泛型实参 `Vec[_]` | 占位：由推断填充 |
+| 参数 `_` | 有意忽略的形参 |
+| 类型位置 `_` | 推断占位（仅 `let`/闭包参数等推断上下文） |
+
+`_` 不可读、不可取地址、不可作为项名或字段名；`__`（双下划线）是合法标识符。
+
+---
+
+## 4. 注释
+
+| 形式 | 语法 | 语义 |
+|---|---|---|
+| 井号行注释 | `#` 到行尾 | 最常用；等价空白 |
+| 斜杠行注释 | `//` 到行尾 | 与 `#` 完全等价，提供 C/Rust 习惯；可与 `#` 混用 |
+| 块注释 | `#\|` 到 `\|#` | 可跨行、**可嵌套**（`#\| ... #\| ... \|# ... \|#` 正确配对）；等价空白 |
+| 文档注释（约定） | 紧邻声明（允许一个空行内）的 `#\| ... \|#` 或连续 `#` 行 | 不是新语法：由 dscc `--doc` 与 `@doc` 属性读取；`typeinfo` 可返回 `doc` 字段 |
+
+规则：
+
+- 注释等价空白，可出现在任意两记号之间；不能出现在记号内部（如 `f#comment\n()` 的 `f` 与 `(` 之间可以，但 `0x#comment\nFF` 非法）。
+- 字符串与字节串内部的 `#`、`//`、`#|` 不是注释。
+- 词法优先级：`#|` > `#`；`/` 后跟 `/` 才是注释，否则按除法。
+- 无 shebang（`#!`）语法；`#!` 按 `#` 行注释处理。
+
+---
+
+## 5. 语法骨架（EBNF）
+
+```ebnf
+(* 顶层 *)
+unit        = package { use } { item } ;
+package     = "package" IDENT NEWLINE ;
+use         = "use" path [ "as" IDENT ] ( "," path [ "as" IDENT ] )* [ ";" ] ;
+path        = IDENT { "." IDENT } ;
+
+item        = { attr } [ vis ] item_kind ;
+vis         = "pub" | "priv" | "prot" ;
+attr        = "@" ( IDENT | "unsafe" ) [ "(" attr_args ")" ] [ block ] ;
+
+item_kind   = fn_decl | let_top | type_decl | class_decl | trait_decl
+            | impl_decl | mod_decl | static_decl | extern_decl
+            | macro_decl | attr_decl | section_block | export_decl ;
+
+fn_decl     = [ "comptime" | "irq" ] "fn" IDENT [ generics ] "(" params ")" 
+              [ "->" type ] ( block | "=>" expr ) [ "at" const_addr ] ;
+generics    = "[" IDENT { "," IDENT } "]" [ where_clause ] ;
+where_clause= "where" bound { "," bound } ;
+bound       = type ":" type { "+" type } ;
+
+type_decl   = "type" IDENT [ generics ] ( block_struct | "=" type ) ;
+block_struct= "{" { field_decl } "}" ;
+field_decl  = [ vis ] IDENT ":" type [ "=" expr ] ;
+class_decl  = "class" IDENT [ "extends" type ] [ generics ] "{" { class_member } "}" ;
+trait_decl  = "trait" IDENT [ generics ] "{" { trait_member } "}" ;
+impl_decl   = "impl" [ type "for" ] type "{" { fn_decl } "}" ;
+mod_decl    = "mod" IDENT ( block | NEWLINE ) ;
+static_decl = "static" [ "mut" ] IDENT ":" type "=" expr [ "at" const_addr ] ;
+extern_decl = "extern" STRING ( fn_sig | block ) ;
+macro_decl  = "macro" IDENT "(" macro_param { "," macro_param } ")" block ;
+attr_decl   = "attr" IDENT "(" "target" ":" attr_target ")" block ;
+section_block = "section" STRING block ;
+
+(* 语句 *)
+block       = "{" { stmt } [ expr ] "}" ;
+stmt        = let_stmt | var_stmt | assign_stmt | if_stmt | while_stmt
+            | for_stmt | loop_stmt | return_stmt | break_stmt | continue_stmt
+            | goto_stmt | label_stmt | send_stmt | assert_stmt
+            | try_stmt | unsafe_block | asm_stmt | expr_stmt | ";" ;
+
+let_stmt    = "let" pattern [ ":" type ] "=" expr [ ";" ] ;
+var_stmt    = "var" pattern [ ":" type ] "=" expr [ ";" ] ;
+assign_stmt = place "=" expr [ ";" ] ;
+label_stmt  = IDENT ":" ;
+goto_stmt   = "goto" IDENT [ ";" ] ;
+
+(* 表达式 *)
+expr        = assign_expr ;
+assign_expr = pipe_expr [ "=" assign_expr ] ;
+pipe_expr   = or_expr { "|>" or_expr } ;
+or_expr     = and_expr { "||" and_expr } ;
+and_expr    = bitor_expr { "&&" bitor_expr } ;
+bitor_expr  = bitxor_expr { "|" bitxor_expr } ;
+bitxor_expr = bitand_expr { "^" bitand_expr } ;
+bitand_expr = equality { "&" equality } ;
+equality    = compare { ( "==" | "!=" ) compare } ;
+compare     = shift { ( "<" | ">" | "<=" | ">=" | "is" | "in" ) shift } ;
+shift       = additive { ( "<<" | ">>" ) additive } ;
+additive    = multiplicative { ( "+" | "-" ) multiplicative } ;
+multiplicative = cast { ( "*" | "/" | "%" ) cast } ;
+cast        = unary { "as" type } ;
+unary       = ( "-" | "!" | "~" | "&" [ "mut" ] | "*" ) unary | postfix ;
+postfix     = primary { "." IDENT | "[" expr [ ":" expr ] "]" | "(" args ")" } ;
+
+primary     = literal | IDENT | "self" | "super" | "new" "(" args ")"
+            | "(" expr ")" | array_lit | map_lit | block
+            | "if" expr block [ "else" ( block | if_expr ) ]
+            | "match" expr "{" match_arm { "," match_arm } "}"
+            | "try" expr | try_block
+            | "recv" expr | "wait" expr
+            | "spawn" ( block | expr ) | "go" expr
+            | "thread" "(" expr ")" | "chan" "[" type "]" [ "(" expr ")" ]
+            | "mutex" "(" expr ")" | "rc" "(" expr ")" | "arc" "(" expr ")" | "gc" "(" expr ")"
+            | "alloc" "(" expr "," expr ")" | "free" expr
+            | "sizeof" "(" ( type | expr ) ")" | "alignof" "(" type ")"
+            | "typeinfo" "(" ( type | expr ) ")"
+            | "comptime" ( expr | block | "if" ... | "for" ... )
+            | "asm" STRING | "asm" "{" asm_operands "}"
+            | fn_lit | block ;
+
+fn_lit      = "fn" "(" params ")" [ "->" type ] "=>" expr ;
+match_arm   = pattern [ "when" expr ] "=>" ( expr | block ) ;
+
+(* 模式 *)
+pattern     = "_" | literal
+            | IDENT [ "@" pattern ]
+            | "some" "(" pattern ")" | "ok" "(" pattern ")" | "err" "(" pattern ")"
+            | "[" pattern { pattern } "]"
+            | "{" IDENT ":" pattern { "," IDENT ":" pattern } "}"
+            | type "(" [ pattern { "," pattern } ] ")"
+            | pattern "|" pattern ;
+
+(* 类型 *)
+type        = IDENT [ "[" type { "," type } "]" ]
+            | "[" type "]" | "[" type ";" expr "]"
+            | "ref" [ "mut" ] type | "ptr" [ "mut" ] type | "volatile" type
+            | "opt" "[" type "]" | "res" "[" type [ "," type ] "]"
+            | "rc" "[" type "]" | "arc" "[" type "]" | "gc" "[" type "]"
+            | "dyn" type | "fn" "(" [ type { "," type } ] ")" [ "->" type ]
+            | "raw" | "(" type ")" ;
+
+(* 字面量 *)
+literal     = INT | FLOAT | STRING | BYTES | "true" | "false" ;
+array_lit   = "[" [ expr { ( "," | NEWLINE ) expr } ] "]" ;
+map_lit     = "{" ":" "}" | "{" ( IDENT | expr ) ":" expr { ( "," | NEWLINE ) ( IDENT | expr ) ":" expr } "}" ;
+```
+
+> 说明：以上为 0.1 骨架，省略了错误恢复与属性参数细节；`comptime if`/`comptime for` 与 `attr` 参数采用与普通 `if`/`for`/结构体相同的子语法。**规范以 §1.3 关键词语义表为准**，EBNF 仅用于消歧。
+
+---
+
+## 6. 语义契约
+
+### 6.1 类型与布局
+
+- 整数有符号补码、无符号二进制；`i32` 为默认整型。无隐式数值提升/截断，混合类型必须 `as`。
+- `type` 为值类型（按值传递、可栈分配），默认布局由编译器决定；`@repr(C)` 使用 C 布局；`packed` 无填充。
+- `class` 为引用语义：变量是句柄，赋值/传参共享同一实例；实例由 `new` 创建，所有权由句柄作用域或 `rc`/`arc`/`gc` 管理。
+- 胖指针：`dyn Trait` 与 `[]T` 为两字宽（数据 + 元数据）；`opt[ptr[T]]` 与指针同宽。
+
+### 6.2 所有权与借用
+
+- 值默认按值拥有；`ref` 借用受别名检查（同一时刻 1×`ref mut` 或 N×`ref`）。
+- 借用值只在**类型站点**产生：调用 `ref T`/`ref mut T` 形参、`let r: ref T = e` 绑定、`self`/`mut self` 接收者。表达式层没有“取引用”记号；`&e`/`&mut e` 得到的是原始指针 `ptr[T]`/`ptr mut T`（不受借用检查）。
+- 不得返回指向局部变量的 `ref`；不得让 `ref` 逃逸出被借用值的生命周期。
+- `ptr` 是逃逸口：不参与借用检查，解引用必须 `@unsafe`。
+- `static` 项生命周期为 `'static`；`static mut` 的访问必须 `@unsafe` 或经原子/`mutex`。
+
+### 6.3 确定性析构与内存
+
+- 离开作用域、字段覆盖、容器销毁、`rc`/`arc` 计数归零时，按"声明逆序"调用 `drop`。
+- `_ = 表达式` 丢弃值时，值仍会被 `drop`（与作用域结束相同），只是不绑定名字。
+- `alloc` 内存不由语言自动释放；必须 `free`，或包装为自定义类型并实现 `drop`。
+- `rc`/`arc` 归零即释放；`gc` 对象只保证"至多一次" `drop`，时机不确定。
+- 析构器内 `panic` 是编译错误；`drop` 期间出现二次 panic 为 `abort`。
+
+### 6.4 错误模型
+
+- 可恢复：返回 `res[T, E]`；`try e` 传播；`catch` 处理；`opt[T]` 用 `none` 表示"无值"而非错误。
+- 不可恢复：`panic`；`--app` 可捕获（`catch panic`），`--bare` 恒 `abort`。
+- `assert` 只用于不变量；失败即 `panic(AssertFailed)`；`comptime` 中失败是编译错误。
+- 不使用异常（`try` 是表达式/块的语法结构，不是栈展开异常）。
+
+### 6.5 并发模型
+
+- `spawn` 作用域内任务组保证：作用域结束前全部 `wait`；任一任务 `panic` 会在 `wait` 处转成 `err` 并向上传播。
+- `go` 是分离任务，须自行同步；进程退出时强制中止。
+- `chan` 有界（默认 0 容量 = 同步交接）；`send`/`recv` 阻塞；关闭后 `send` 失败、`recv` 得 `none`。
+- `mutex` 守卫不可跨 `wait`/`spawn` 持有；死锁检测仅在 `--rt full` 的调试构建中启用。
+- 线程安全类型标记：`rc`、`ptr`、`raw`、`ref`（指向非 `Sync` 数据时）为 `!Send`；`arc`、`mutex[T]`、`chan[T]` 按内部类型决定。
+
+### 6.6 裸机契约（`--bare`）
+
+- 无 OS、无 GC、无隐式堆分配；启用 `gc` 或 `--gc != none` 是编译错误。
+- 入口：`@entry fn _start()` 或 `section ".boot" { fn _start() }`；复位向量由 dscc 生成或由 `@at` 固定。
+- 分配：必须提供 `@allocator` 的 allocator 实现，`alloc` 才可用；否则 `alloc` 是编译错误。
+- `asm`/`volatile`/`ptr` 解引用/`static mut` 访问必须在 `@unsafe` 中。
+- `irq fn` 由 dscc 生成上下文保存/恢复；ISR 内禁止阻塞原语。
+- `section`/`at`/`packed` 影响链接布局，须与链接脚本一致；dscc 会输出布局报告（`--emit map`）。
+
+### 6.7 元编程阶段
+
+| 机制 | 阶段 | 作用对象 | 能力边界 |
+|---|---|---|---|
+| `macro` | 解析期 | 语法（token/AST） | 只能模板展开，不可求值任意值 |
+| `comptime` | 类型检查前/中 | 值、类型、布局 | 不可 I/O、不可 `asm`/`extern`、不可分配非编译期内存 |
+| `typeinfo` | 编译期（`comptime` 内） | 类型元数据 | 运行期保留需 `--rt full` |
+| `attr` | 编译期 | 声明上的结构化参数 | 编译器不解释，由 `comptime` 代码读取 |
+
+- `comptime` 与 `macro` 的组合顺序：宏展开 → 类型检查 → `comptime` 求值（类型级 `comptime` 在检查中）。
+- 同一 `comptime fn` 对同一实参只求值一次（记忆化），跨编译单元不共享。
+
+### 6.8 OOP 契约
+
+- `class` 单继承；`extends` 只允许一个父类；父类构造必须经 `super.init(...)`。
+- 方法默认静态派发；`dyn Trait` 才动态派发；`class` 的虚方法走 vtable（唯一动态派发点）。
+- `drop` 沿继承链由派生类到基类依次调用。
+- `self` 在 `class` 方法中是 `ref self`（不可为空）；`new` 返回非空实例。
+
+---
+
+## 7. 编译驱动 `dscc`
+
+### 7.1 概要
+
+```
+dscc <input.ds> [选项]
+dscc --version | --help
+```
+
+`input.ds` 必须是含 `package` 声明的包根文件；子模块由编译器按 `mod` 自动发现。
+
+### 7.2 核心选项（0.1 规范内）
+
+<!-- DSDC:BEGIN -->
+
+| 选项 | 取值 | 默认 | 语义 |
+|---|---|---|---|
+| `-o <path>` | 文件路径 | 由 `--emit` 决定 | 输出路径；`--app` 默认 `a.out`，`--bare` 默认 `<package>.elf` |
+| `--app` | 布尔 | 与 `--bare` 二选一，缺省为 `--app` | 应用模式：链接 OS 运行时、支持线程/通道/GC/panic 展开 |
+| `--bare` | 布尔 | 同上 | 裸机模式：`no_std`、无 OS、无 GC、无线程池；入口与分配器须自行提供；与 `--app` 互斥 |
+| `--target <triple>` | 目标三元组 | 宿主 | 目标平台，见 §7.4 |
+| `--opt <level>` | `0` `1` `2` `3` `s` `z` | `2` | 优化级别；`s`/`z` 为体积优先；`0` 保留调试信息与 `assert` 消息 |
+| `--gc <mode>` | `none` `rc` `arc` `tracing` | `--app`: `tracing`；`--bare`: `none` | GC 策略：`none` 禁用 `gc[T]`；`rc`/`arc` 仅启用相应智能指针的运行时支持；`tracing` 启用追踪式 GC 与 `gc[T]`；`--bare` 只接受 `none` |
+| `--rt <kind>` | `none` `minimal` `full` | `--app`: `full`；`--bare`: `minimal` | 运行时：`none` 不注入任何运行时（须自定义 `_start`）；`minimal` 仅启动/panic=abort/无 GC；`full` 线程池+通道+GC+panic 展开+`typeinfo` 运行期 |
+
+<!-- DSDC:END -->
+
+### 7.3 扩展选项（0.1 允许实现，不属于用户清单）
+
+| 选项 | 语义 |
+|---|---|
+| `--emit <obj\|asm\|llvm-ir\|bin\|map\|doc>` | 产物类型；`map` 输出布局报告，`doc` 输出文档 |
+| `-g` | 生成调试信息（默认 `--opt 0`/`1` 下开启） |
+| `--check` | 仅类型检查，不产出 |
+| `-L <dir>` | 链接库搜索路径 |
+| `--features <list>` | 包特性开关（配合包管理器） |
+| `--edition <0.1>` | 语言版本，用于未来迁移 |
+| `--color <auto\|always\|never>` | 诊断着色 |
+| `-v` / `--version` / `--help` | 版本/帮助 |
+
+### 7.4 目标三元组（0.1 支持范围）
+
+| 目标 | 模式 | 说明 |
+|---|---|---|
+| `x86_64-unknown-linux-gnu` | `--app` / `--bare` | 默认宿主 |
+| `aarch64-unknown-linux-gnu` | `--app` / `--bare` | |
+| `aarch64-linux-android` | `--app` | 宿主为 Android/Termux 时可用 |
+| `thumbv7em-none-eabi` | `--bare` | Cortex-M4F 裸机 |
+| `riscv32-unknown-none-elf` | `--bare` | RV32 裸机 |
+| `wasm32-unknown-unknown` | `--app` | 无 `asm`/`at`/`section` 语义，`--bare` 非法 |
+| `x86_64-unknown-none` | `--bare` | PC 裸机 |
+
+### 7.5 模式互斥与默认矩阵
+
+| 组合 | `--app` | `--bare` |
+|---|---|---|
+| `--gc` | `none`/`rc`/`arc`/`tracing` | 仅 `none`，否则退出码 2 |
+| `--rt` | `none`/`minimal`/`full` | `none`/`minimal`，`full` 退出码 2 |
+| `as m` | 允许 | 编译错误 |
+| `thread`/`go` | 允许 | 编译错误（无 OS 线程），`spawn` 降级为单线程执行器 |
+| `gc[T]` | `--gc != none` 时允许 | 编译错误 |
+| `alloc` | 默认系统分配器 | 必须 `@allocator` |
+
+### 7.6 退出码
+
+| 码 | 含义 |
+|---|---|
+| `0` | 成功 |
+| `1` | 编译/类型/词法错误 |
+| `2` | 用法错误（未知选项、互斥冲突、非法目标） |
+| `3` | 内部错误（ICE），请附 `--emit map` 报告 |
+| `4` | 链接/目标不可用（缺少目标运行时或链接器） |
+
+### 7.7 示例
+
+```bash
+# 应用模式：默认 --opt 2 --gc tracing --rt full
+dscc hello.ds -o hello --app --opt 2 --gc tracing --rt full
+
+# 裸机固件：无 GC、最小运行时、体积优先
+dscc main.ds -o firmware.elf --bare --target thumbv7em-none-eabi --opt z --gc none --rt minimal
+
+# 仅检查 + 布局报告
+dscc main.ds --bare --target riscv32-unknown-none-elf --check --emit map
+```
+
+---
+
+## 8. 示例
+
+完整可读示例见仓库 `examples/` 目录（示例用于演示语法形态，未经编译器验证，不构成规范）：
+
+- [`examples/tour.ds`](../examples/tour.ds)：应用模式综合示例（类型/类/trait/错误/模式/元编程/管道）。
+- [`examples/concurrency.ds`](../examples/concurrency.ds)：`spawn`/`go`/`thread`/`chan`/`send`/`recv`/`mutex`/`wait`。
+- [`examples/memory.ds`](../examples/memory.ds)：`alloc`/`free`/`rc`/`arc`/`ref`/`ptr`/`raw`/`volatile`。
+- [`examples/bare.ds`](../examples/bare.ds)：裸机模式（`section`/`at`/`irq`/`asm`/`packed`/`static mut`）。
+
+最小程序：
+
+```ds
+package hello
+
+fn main() {
+    let who = "Ds"
+    println("hello, " + who)
+}
+```
+
+---
+
+## 9. 版本化、保留与未纳入特性
+
+- **0.1 冻结**：§1.3 的 77 项关键字不可增删；后续版本新增关键字必须走 `--edition` 迁移路径。
+- **0.1 明确不提供**（保持 v0.1 范围）：
+  - 例外/栈展开语义（`panic` 在 `--bare` 下是 `abort`）；
+  - 多继承、扩展方法跨包、运算符重载函数形式（运算符集合固定）；
+  - 字符串插值、字符字面量、八进制字面量、范围字面量、`..` 展开；
+  - `async`/`await`（0.2 候选）、`defer`、`yield`、`const`（用 `static` + `comptime` 替代）、`enum`/`union`/`struct`（用 `type` + `comptime` 表达，0.2 评估）；
+  - 宏卫生之外的 `macro_rules` 递归、过程宏（0.2 候选）；
+  - 结构化并发之外的任务调度策略（`go` 之外的优先级/亲和性）。
+- **0.2 候选关键字升格**：`struct` `enum` `const` `defer` `async` `await`。在 0.1 中它们**不是**关键字，可自由用作标识符。
+
+---
+
+## 附录 A：关键词覆盖核对
+
+| 类别 | 口令数 | 标识符关键字 | 符号关键字 | 表格位置 |
+|---|---|---|---|---|
+| 定义 | 9 | 9 | 0 | §1.3 定义 |
+| 控制 | 9 | 9 | 0 | §1.3 控制 |
+| 管道 | 3 | 0 | 3（`->` `=>` `\|>`） | §1.3 管道 |
+| 错误 | 7 | 7 | 0 | §1.3 错误 |
+| 模块 | 8 | 8 | 0 | §1.3 模块 |
+| 并发 | 8 | 8 | 0 | §1.3 并发 |
+| 内存 | 9 | 9 | 0 | §1.3 内存 |
+| 裸机 | 7 | 6 | 1（`@`） | §1.3 裸机 |
+| 元编程 | 4 | 4 | 0 | §1.3 元编程 |
+| OOP | 6 | 6 | 0 | §1.3 OOP |
+| 模式 | 7 | 7 | 0 | §1.3 模式 |
+| **合计** | **77** | **73** | **4** | |
+
+> 上述表格由 `tools/ds_keywords.py check` 与 §1.3 自动核对：逐词检查"是否出现、是否唯一、是否落在正确类别、各类计数是否一致"。机器可读版本见 `spec/keywords.json`（由 `tools/ds_keywords.py build` 生成）。
+
+
+## 4. 完整示例与真实输出
+
+### `examples/bare.ds`
+
+```ds
+# Ds v0.1 裸机示例
+#
+# 编译： dscc bare.ds -o firmware.elf --bare \
+#            --target thumbv7em-none-eabi --opt z --gc none --rt minimal
+#
+# 覆盖：section / at / irq / asm / volatile / packed / static mut
+#       @entry / @unsafe / ptr / raw / goto / loop / sizeof / alignof
+# 注意：裸机模式无 OS、无 GC、无隐式分配；ISR 内禁止阻塞原语。
+
+package firmware
+
+section ".boot" {
+    @entry
+    fn reset_handler() at 0x0000_0000 {
+        init()
+        loop {
+            @unsafe { asm "wfi" }
+        }
+    }
+}
+
+static mut TICKS: u32 = 0
+
+packed type FrameHeader {
+    magic: u16,
+    len: u32,
+}
+
+@irq(5)
+irq fn timer_tick() {
+    @unsafe {
+        TICKS = TICKS + 1
+    }
+}
+
+fn read_reg(addr: usize) -> u32 {
+    @unsafe {
+        let p = addr as volatile ptr[u32]
+        *p
+    }
+}
+
+@unsafe
+fn write_reg(addr: usize, value: u32) {
+    let p = addr as volatile ptr[u32]
+    *p = value
+}
+
+fn init() {
+    write_reg(0x4000_0000, 1)
+}
+
+fn delay(limit: u32) -> u32 {
+    var n: u32 = 0
+again:
+    n = n + 1
+    if n < limit { goto again }
+    n
+}
+
+fn main() {
+    let h = FrameHeader(magic: 0x5A5A as u16, len: 8 as u32)
+    let size = sizeof(FrameHeader)
+    let align = alignof(FrameHeader)
+    _ = h
+    _ = size
+    _ = align
+    _ = delay(10)
+}
+```
+
+输出：
+
+```text
+
+```
+
+### `examples/concurrency.ds`
+
+```ds
+# Ds v0.1 并发示例（应用模式，--rt full）
+#
+# 覆盖：spawn / go / thread / chan / send / recv / mutex / wait
+#       opt 结果匹配、结构化并发作用域、块表达式、通道关闭
+
+package concurrency
+
+fn worker(ch: chan[i32], id: i32) {
+    send ch, id
+}
+
+fn compute() -> i32 {
+    42
+}
+
+fn realtime_loop() {
+    var n = 0
+    while n < 3 {
+        n = n + 1
+    }
+}
+
+fn main() {
+    # 有界通道 + 分离式任务（go 不登记作用域，须自行同步）
+    let ch = chan[i32](8)
+    for i in [1 2 3] {
+        go worker(ch, i)
+    }
+
+    var sum = 0
+    for _ in [0 1 2] {
+        match recv ch {
+            some(v) => sum = sum + v,
+            none => break,
+        }
+    }
+    _ = sum
+
+    # 结构化并发：离开块时自动 wait，任务 panic 转为 err
+    {
+        let t = spawn { compute() }
+        match wait t {
+            ok(v) => println("task ok"),
+            err(e) => println("task failed"),
+        }
+    }
+
+    # 共享可变状态只能经 mutex；守卫离开作用域自动解锁
+    let m = mutex(0)
+    {
+        let guard = m.lock()
+        _ = guard
+    }
+
+    # 独占 OS 线程
+    let t2 = thread(realtime_loop)
+    wait t2
+
+    # 无缓冲通道：同步交接；关闭后 recv 得 none
+    let ch2 = chan[i32]()
+    send ch2, 7
+    match recv ch2 {
+        some(v) => println("got value"),
+        none => println("closed"),
+    }
+    ch2.close()
+}
+```
+
+输出：
+
+```text
+task ok
+got value
+```
+
+### `examples/memory.ds`
+
+```ds
+# Ds v0.1 内存示例（应用模式）
+#
+# 覆盖：alloc / free / rc / arc / ref / mut / ptr / raw / gc / volatile / @unsafe
+#       drop 确定性析构、ptr 解引用与算术、借用绑定
+
+package memory
+
+type Buffer {
+    data: ptr[u8],
+    len: usize,
+}
+
+impl Buffer {
+    fn new(len: usize) -> Buffer {
+        Buffer(data: alloc(len, alignof(u8)), len: len)
+    }
+
+    fn get(ref self, i: usize) -> opt[u8] {
+        if i >= self.len {
+            return none
+        }
+        @unsafe { some(*(self.data + i)) }
+    }
+
+    drop(self) {
+        free(self.data)
+    }
+}
+
+type Node {
+    next: opt[rc[Node]],
+}
+
+fn main() {
+    # 裸块分配 + 自定义 drop：离开作用域自动 free
+    let b = Buffer.new(16)
+    match b.get(0) {
+        some(v) => println("byte read"),
+        none => println("out of bounds"),
+    }
+
+    # 引用计数：最后一份释放时触发 Buffer.drop
+    let shared = rc(Buffer.new(4))
+    let alias = shared.clone()
+
+    # 原子引用计数 + mutex：可跨线程
+    let thread_safe = arc(mutex(0))
+
+    # 借用绑定（类型站点自动借用，非拥有）
+    let base = Buffer.new(8)
+    let borrowed: ref Buffer = base
+    let mutable: ref mut Buffer = base
+
+    # 裸指针与 raw：绕过借用检查
+    let address: raw = base.data as raw
+    @unsafe {
+        let p: ptr[u32] = 0x4000_0000 as ptr[u32]
+        let first = *p
+        let second = *(p + 1)
+        _ = first
+        _ = second
+    }
+
+    # MMIO：易失访问不可被优化
+    let reg: volatile ptr[u32] = 0x4000_0000 as volatile ptr[u32]
+    @unsafe {
+        let status = *reg
+        _ = status
+    }
+
+    # GC 托管对象：仅 --gc != none 可用
+    let node = gc(Node(next: none))
+
+    _ = alias
+    _ = thread_safe
+    _ = borrowed
+    _ = mutable
+    _ = address
+    _ = node
+}
+```
+
+输出：
+
+```text
+byte read
+```
+
+### `examples/tour.ds`
+
+```ds
+# Ds v0.1 综合示例（应用模式）
+#
+# 覆盖：package / mod / use / export / pub / priv / prot
+#       type / class / trait / impl / extends / super / new / drop / dyn
+#       let / var / if / else / match / when / for / while / loop
+#       break / continue / return / goto
+#       res / opt / try / catch / panic / assert
+#       |> / sizeof / alignof / comptime / macro / typeinfo / attr
+#       in / is / ref / mut
+#
+# 说明：示例用于展示语法形态，尚未经编译器验证，不构成规范。
+
+package tour
+
+mod geometry {
+    pub type Vec2 {
+        x: f32,
+        y: f32,
+    }
+
+    pub fn length(v: ref Vec2) -> f32 {
+        let dx = v.x
+        let dy = v.y
+        math.sqrt(dx * dx + dy * dy)
+    }
+}
+
+use geometry.{Vec2, length}
+
+export geometry.Vec2
+
+trait Draw {
+    fn draw(ref self) -> str
+}
+
+impl Draw for Vec2 {
+    fn draw(ref self) -> str {
+        "vec2"
+    }
+}
+
+impl Vec2 {
+    fn scale(mut self, k: f32) {
+        self.x = self.x * k
+        self.y = self.y * k
+    }
+}
+
+class Shape {
+    name: str
+
+    fn new(name: str) {
+        self.name = name
+    }
+
+    fn describe(ref self) -> str {
+        self.name
+    }
+}
+
+class Circle extends Shape {
+    radius: f32
+
+    fn new(radius: f32) {
+        super.init("circle")
+        self.radius = radius
+    }
+
+    drop(self) {
+        println("drop " + self.name)
+    }
+}
+
+fn checked_div(a: i32, b: i32) -> res[i32, error] {
+    if b == 0 {
+        return err(error("division by zero"))
+    }
+    ok(a / b)
+}
+
+fn ratio(a: i32, b: i32) -> res[i32, error] {
+    let v = try checked_div(a, b)
+    ok(v + 1)
+}
+
+fn parse_opt(o: opt[i32]) -> i32 {
+    match o {
+        some(v) when v > 0 => v,
+        some(_) => 0,
+        none => -1,
+    }
+}
+
+macro unless(c: expr, b: block) {
+    if !c { b }
+}
+
+attr doc(target: fn) {
+    text: str
+}
+
+fn spin(limit: u32) -> u32 {
+    var n: u32 = 0
+retry:
+    n = n + 1
+    if n < limit { goto retry }
+    n
+}
+
+priv fn helper() { }
+
+prot fn internal() { }
+
+extern "C" fn host_log(s: str) -> i32
+
+fn show[T](x: T) -> str where T: Draw {
+    x.draw()
+}
+
+fn boom() {
+    try {
+        panic "boom"
+    } catch panic {
+        let payload = recover
+        _ = payload
+    }
+}
+
+@doc(text: "Ds v0.1 demonstration")
+fn main() {
+    var total = 0
+    for v in [1 2 3 4 5] {
+        if v == 4 { continue }
+        total = total + v
+    }
+
+    var i = 0
+    loop {
+        i = i + 1
+        if i >= 3 { break }
+    }
+    while i > 0 {
+        i = i - 1
+    }
+
+    let p = Vec2(x: 3.0, y: 4.0)
+    let len = length(p) |> math.round
+    println(p.draw())
+
+    let c = Circle.new(2.0)
+    println(c.describe())
+
+    let d: rc[dyn Draw] = rc(Vec2(x: 1.0, y: 2.0)) as rc[dyn Draw]
+    println(d.draw())
+
+    if "x" in ["x" "y"] {
+        println("contains")
+    }
+    if total is i32 {
+        println("signed total")
+    }
+    if total > 0 {
+        println("positive")
+    } else {
+        println("non-positive")
+    }
+
+    assert parse_opt(none) == -1, "none maps to -1"
+    assert parse_opt(some(5)) == 5, "some maps to itself"
+
+    match ratio(8, 2) {
+        ok(v) => println("ratio ok"),
+        err(e) => println("ratio failed"),
+    }
+    match ratio(8, 0) {
+        ok(_) => println("unreachable"),
+        err(e) => println("caught: " + e.message),
+    }
+
+    comptime {
+        assert sizeof(Vec2) >= 8, "Vec2 too small"
+        assert alignof(Vec2) <= 8, "Vec2 over-aligned"
+    }
+    let info = comptime typeinfo(Vec2)
+    println(info.name)
+    println(show(p))
+    helper()
+    internal()
+    boom()
+
+    unless(false, { println("unless fires") })
+
+    _ = spin(1)
+}
+```
+
+输出：
+
+```text
+vec2
+circle
+vec2
+contains
+signed total
+positive
+ratio ok
+caught: division by zero
+Vec2
+vec2
+unless fires
+drop circle
+```
+
+## 5. 机器可读关键词表（spec/keywords.json）
+
+```json
+{
+  "language": "Ds",
+  "version": "0.1.0",
+  "status": "definition-only",
+  "spec": "spec/DS-v0.1.md",
+  "generated_by": "tools/ds_keywords.py build",
+  "totals": {
+    "keywords": 77,
+    "identifier_keywords": 73,
+    "symbol_keywords": 4,
+    "categories": 11,
+    "operators": 26
+  },
+  "categories": [
+    {
+      "name": "定义",
+      "count": 9,
+      "keywords": [
+        {
+          "index": 1,
+          "word": "fn",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 1,
+          "form": "fn 名[T](参数) -> 返回类型 { ... }；类型位置写 fn(参数) -> 返回类型",
+          "semantic": "声明函数/方法、或书写函数类型值；函数体为块或 => 单表达式；无默认参数、无重载（重载由 trait + 泛型表达）",
+          "example": "fn add(a: i32, b: i32) -> i32 { a + b }"
+        },
+        {
+          "index": 2,
+          "word": "let",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 2,
+          "form": "let 名: 类型 = 表达式",
+          "semantic": "不可变绑定：只初始化一次，此后不可赋值、不可取 ref mut；类型可省略由初始化表达式推断",
+          "example": "let pi = 3.14159"
+        },
+        {
+          "index": 3,
+          "word": "var",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 3,
+          "form": "var 名: 类型 = 表达式",
+          "semantic": "可变绑定：可多次赋值；赋值目标必须是可写位置（var 绑定、*ptr、字段、索引）",
+          "example": "var n = 0 然后 n = n + 1"
+        },
+        {
+          "index": 4,
+          "word": "type",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 4,
+          "form": "type 名[T] { 字段: 类型, ... } 或 type 别名 = 类型",
+          "semantic": "定义值类型（结构体，按值传递、可栈分配）或类型别名；无继承；默认布局 repr(Ds)，可用 @repr(C)/packed/@align(n) 覆盖；实例用值构造语法 名(字段: 值, ...) 创建，也允许在 impl 中补充命名构造器 new",
+          "example": "type Point { x: f32, y: f32 }"
+        },
+        {
+          "index": 5,
+          "word": "class",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 5,
+          "form": "class 名 extends 基类 { 字段; 方法 }",
+          "semantic": "定义类：引用语义（句柄即类名）、单继承、虚派、确定性析构；实例经 new 构造，离开作用域时句柄计数归零即 drop",
+          "example": "class Animal { fn speak(self) -> str { \"...\" } }"
+        },
+        {
+          "index": 6,
+          "word": "trait",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 6,
+          "form": "trait 名[T] { fn 方法(self) -> 类型 }",
+          "semantic": "定义接口/约束：可含方法签名、默认方法、关联类型与常量；由 impl 实现，可装箱为 dyn",
+          "example": "trait Draw { fn draw(self) }"
+        },
+        {
+          "index": 7,
+          "word": "impl",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 7,
+          "form": "impl Trait for 类型 { ... } 或 impl 类型 { ... }",
+          "semantic": "为类型实现 trait（孤儿规则：trait 或类型至少一个属于本包）或补充固有方法/关联函数块",
+          "example": "impl Draw for Circle { fn draw(self) { ... } }"
+        },
+        {
+          "index": 8,
+          "word": "mod",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 8,
+          "form": "mod 名 { ... } 或 mod 名",
+          "semantic": "声明子模块：内联块或外部 <名>.ds；模块是名字空间与可见性边界，也是 use 路径的一段",
+          "example": "mod net { pub fn get() {} }"
+        },
+        {
+          "index": 9,
+          "word": "package",
+          "kind": "identifier",
+          "category": "定义",
+          "position": 9,
+          "form": "package 名",
+          "semantic": "包声明，必须是编译单元第一行；一次 dscc 调用编译一个包；包名即根模块名，也是 typeinfo 中类型的限定前缀",
+          "example": "package myapp"
+        }
+      ]
+    },
+    {
+      "name": "控制",
+      "count": 9,
+      "keywords": [
+        {
+          "index": 10,
+          "word": "if",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 1,
+          "form": "if 条件 { } else if 条件 { } else { }",
+          "semantic": "条件分支，同时是表达式：所有分支的值类型必须一致；条件是 bool，无隐式真值转换",
+          "example": "let m = if a > b { a } else { b }"
+        },
+        {
+          "index": 11,
+          "word": "else",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 2,
+          "form": "else { ... } 或 else if ...",
+          "semantic": "与最近的未配对 if 结合；else 后必须是块或另一个 if；if 作语句且无 else 时值为 unit",
+          "example": "if ok { } else { }"
+        },
+        {
+          "index": 12,
+          "word": "loop",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 3,
+          "form": "loop { ... }",
+          "semantic": "无限循环；只能由 break/return/goto/panic 离开；break 表达式 使 loop 作为表达式产出该值",
+          "example": "let n = loop { break 42 }"
+        },
+        {
+          "index": 13,
+          "word": "while",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 4,
+          "form": "while 条件 { ... }",
+          "semantic": "前置条件循环：每轮先求值条件；仅接受 bool；条件中的借用不得跨轮次逃逸",
+          "example": "while n < 10 { n = n + 1 }"
+        },
+        {
+          "index": 14,
+          "word": "for",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 5,
+          "form": "for 模式 in 可迭代 { ... }",
+          "semantic": "迭代循环：可迭代值为数组、切片、映射、通道、迭代器；每轮对元素做模式解构并（默认）以 ref 借用；无 range 语法糖，整数区间用 prelude range(a, b)",
+          "example": "for x in [1 2 3] { }"
+        },
+        {
+          "index": 15,
+          "word": "break",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 6,
+          "form": "break 或 break 表达式",
+          "semantic": "跳出最近一层循环；带值时该值成为外层 loop 表达式的值；只能在循环体内",
+          "example": "break 42"
+        },
+        {
+          "index": 16,
+          "word": "continue",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 7,
+          "form": "continue",
+          "semantic": "结束当前轮、进入下一轮；只能在循环体内",
+          "example": "continue"
+        },
+        {
+          "index": 17,
+          "word": "return",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 8,
+          "form": "return 或 return 表达式",
+          "semantic": "从当前函数返回；函数尾表达式是隐式返回值，因此可省略 return；返回类型 -> ! 表示发散",
+          "example": "return x"
+        },
+        {
+          "index": 18,
+          "word": "goto",
+          "kind": "identifier",
+          "category": "控制",
+          "position": 9,
+          "form": "goto 标签",
+          "semantic": "同函数内无条件跳转：目标由语句 标签: 声明；禁止跨函数、禁止跳入 try/match 分支/循环体内部、禁止跳过带析构的绑定；标签在优化后可能消失但语义不变",
+          "example": "goto retry"
+        }
+      ]
+    },
+    {
+      "name": "管道",
+      "count": 3,
+      "keywords": [
+        {
+          "index": 19,
+          "word": "->",
+          "kind": "symbol",
+          "category": "管道",
+          "position": 1,
+          "form": "fn f(..) -> 返回类型；类型位置 fn(A) -> B",
+          "semantic": "类型层的\"指向/产出\"箭头：声明返回类型、书写函数类型、-> ! 表示发散（永不返回）；不参与表达式运算",
+          "example": "fn f() -> ! { panic \"never\" }"
+        },
+        {
+          "index": 20,
+          "word": "=>",
+          "kind": "symbol",
+          "category": "管道",
+          "position": 2,
+          "form": "模式 => 表达式；fn(参数) => 表达式",
+          "semantic": "值层的\"产出\"箭头：match 分支体、单表达式函数体、匿名函数体；与 -> 分工——-> 管类型，=> 管值",
+          "example": "match x { 0 => \"zero\", _ => \"other\" }"
+        },
+        {
+          "index": 21,
+          "word": "|>",
+          "kind": "symbol",
+          "category": "管道",
+          "position": 3,
+          "form": "值 |> 函数",
+          "semantic": "管道运算符（左结合）：a |> f |> g 等价 g(f(a))；右侧为函数值时展开为调用，为 fn 字面量时等价直接调用；只做语法降糖，不改变求值顺序（仍从左到右求值操作数）",
+          "example": "s |> parse |> validate"
+        }
+      ]
+    },
+    {
+      "name": "错误",
+      "count": 7,
+      "keywords": [
+        {
+          "index": 22,
+          "word": "try",
+          "kind": "identifier",
+          "category": "错误",
+          "position": 1,
+          "form": "try 表达式；try { ... } catch e { ... }",
+          "semantic": "两种形式：① try e——e: res[T, E]，ok 时取出 T，err 时立即 return err(e)（所在函数必须返回 res）；② try 块——捕获块内普通错误与 panic，交给 catch 处理",
+          "example": "let v = try parse(s)"
+        },
+        {
+          "index": 23,
+          "word": "catch",
+          "kind": "identifier",
+          "category": "错误",
+          "position": 2,
+          "form": "catch e { ... }；catch panic p { ... }",
+          "semantic": "捕获普通错误（e: E）或 panic 载荷（p 可省，用 recover 取）；catch 块是表达式，其值即 try 表达式的值；未捕获的 panic 向上传播",
+          "example": "try { f() } catch e { log(e) }"
+        },
+        {
+          "index": 24,
+          "word": "panic",
+          "kind": "identifier",
+          "category": "错误",
+          "position": 3,
+          "form": "panic 表达式",
+          "semantic": "不可恢复错误：--app 下默认展开栈并中止进程，可被外层 catch panic 捕获；--bare 下恒为 abort（无展开运行时）；panic 载荷类型为 prelude error 的扩展",
+          "example": "panic \"out of memory\""
+        },
+        {
+          "index": 25,
+          "word": "recover",
+          "kind": "identifier",
+          "category": "错误",
+          "position": 4,
+          "form": "recover",
+          "semantic": "仅在 catch panic 块内合法：返回被 panic 抛出的载荷；在其他位置出现是编译错误；不恢复寄存器，只取载荷",
+          "example": "try { g() } catch panic { log(recover) }"
+        },
+        {
+          "index": 26,
+          "word": "assert",
+          "kind": "identifier",
+          "category": "错误",
+          "position": 5,
+          "form": "assert 条件, \"消息\"",
+          "semantic": "断言语句：条件必须是 bool，失败走 panic(AssertFailed)；comptime 上下文中静态求值，失败即编译错误；--opt >= 2 保留失败路径与消息",
+          "example": "assert n < 1024, \"overflow\""
+        },
+        {
+          "index": 27,
+          "word": "res",
+          "kind": "identifier",
+          "category": "错误",
+          "position": 6,
+          "form": "res[T, E = error]",
+          "semantic": "内建结果类型：ok(T) / err(E)；try/catch 的操作对象；与 prelude error trait 配合",
+          "example": "fn parse(s: str) -> res[i32, error]"
+        },
+        {
+          "index": 28,
+          "word": "opt",
+          "kind": "identifier",
+          "category": "错误",
+          "position": 7,
+          "form": "opt[T]",
+          "semantic": "内建可选类型：some(T) / none；opt[ptr[T]]、opt[rc[T]] 保证与指针同宽（空指针优化）；与 res 互转用 std ok_or/ok",
+          "example": "fn find(xs: []i32) -> opt[i32]"
+        }
+      ]
+    },
+    {
+      "name": "模块",
+      "count": 8,
+      "keywords": [
+        {
+          "index": 29,
+          "word": "use",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 1,
+          "form": "use 路径 [as 别名]；use 路径.{a, b}",
+          "semantic": "导入名字到当前作用域；路径用 . 分隔；未使用导入是警告；不可导入 priv 项；use 不产生运行时代码",
+          "example": "use net.http as http"
+        },
+        {
+          "index": 30,
+          "word": "as",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 2,
+          "form": "use a as b；表达式 as 类型",
+          "semantic": "双用途：导入/导出/模式绑定别名；显式类型转换（总是成功，位级语义——数值截断与扩展、整数↔浮点、指针重解释、trait upcast）；受检转换用 prelude try_from",
+          "example": "let a = x as u32"
+        },
+        {
+          "index": 31,
+          "word": "export",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 3,
+          "form": "export 项, 项；export mod.api",
+          "semantic": "重导出：把子模块中的项提到包对外 API 表；被 export 的项即使定义在 priv 模块也对包外可见",
+          "example": "export net.http"
+        },
+        {
+          "index": 32,
+          "word": "pub",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 4,
+          "form": "pub 项",
+          "semantic": "公开可见：跨包可用，属于包 ABI 的一部分；pub 类型的 pub 字段才是外部可写",
+          "example": "pub fn api() {}"
+        },
+        {
+          "index": 33,
+          "word": "priv",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 5,
+          "form": "priv 项",
+          "semantic": "私有可见：仅当前模块可见；这是**默认**可见性，显式书写用于审计与意图表达",
+          "example": "priv fn helper() {}"
+        },
+        {
+          "index": 34,
+          "word": "prot",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 6,
+          "form": "prot 项",
+          "semantic": "包内可见：本包及子模块可见、包外不可见（包级保护）；0.1 不提供子类可见性",
+          "example": "prot static VERSION: u32 = 1"
+        },
+        {
+          "index": 35,
+          "word": "static",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 7,
+          "form": "static 名: 类型 = 常量；static mut；impl T { static fn f() }",
+          "semantic": "静态存储项（地址稳定、程序生命周期、必须常量初始化）或静态方法；static mut 可写但访问需 @unsafe 或经原子/mutex；@at/at 可固定地址",
+          "example": "static mut COUNTER: u32 = 0"
+        },
+        {
+          "index": 36,
+          "word": "extern",
+          "kind": "identifier",
+          "category": "模块",
+          "position": 8,
+          "form": "extern \"ABI\" fn 名(..) -> 类型；extern { ... }",
+          "semantic": "FFI：声明无函数体的外部符号并指定 ABI（\"C\"/\"sysv\"/\"fastcall\"）；调用外部函数隐式处于 @unsafe 上下文；extern 块可批量声明",
+          "example": "extern \"C\" fn puts(s: str) -> i32"
+        }
+      ]
+    },
+    {
+      "name": "并发",
+      "count": 8,
+      "keywords": [
+        {
+          "index": 37,
+          "word": "spawn",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 1,
+          "form": "spawn { ... }；spawn f(args)",
+          "semantic": "结构化并发：在当前任务组内启动任务并返回 task[T]；离开作用域时自动 wait 全部任务并传播首个错误/panic；任务组同时是取消边界",
+          "example": "spawn { work() }"
+        },
+        {
+          "index": 38,
+          "word": "go",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 2,
+          "form": "go f(args)",
+          "semantic": "分离式启动：不登记到当前作用域、不自动等待，进程退出时被强制中止；必须用 chan/wait/mutex 显式同步，否则是数据竞争风险点",
+          "example": "go worker(ch)"
+        },
+        {
+          "index": 39,
+          "word": "thread",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 3,
+          "form": "thread(函数)；类型位置 thread",
+          "semantic": "创建独占 OS 线程（1:1 映射）并返回 thread 句柄；spawn/go 默认跑在共享线程池，thread 用于长时间阻塞 FFI 或实时任务",
+          "example": "let t = thread(realtime_loop)"
+        },
+        {
+          "index": 40,
+          "word": "chan",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 4,
+          "form": "chan[T]；chan[T](容量)",
+          "semantic": "通道类型构造：默认无缓冲（同步交接），chan[T](n) 为有界缓冲；关闭用 ch.close()；关闭后 recv 得 none",
+          "example": "let ch = chan[i32](32)"
+        },
+        {
+          "index": 41,
+          "word": "send",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 5,
+          "form": "send 通道, 值",
+          "semantic": "发送语句/表达式：无缓冲时阻塞直到有接收方；缓存满时阻塞；通道已关闭时失败，返回 res[unit, error]（可忽略）",
+          "example": "send ch, 42"
+        },
+        {
+          "index": 42,
+          "word": "recv",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 6,
+          "form": "recv 通道",
+          "semantic": "接收表达式：有值返回 some(v)，通道关闭且已空返回 none；无值且未关闭时阻塞",
+          "example": "let v = recv ch"
+        },
+        {
+          "index": 43,
+          "word": "mutex",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 7,
+          "form": "mutex[T]；mutex(值)",
+          "semantic": "内建互斥锁：lock() 返回守卫，守卫离开作用域自动解锁；是跨线程共享可变状态的唯一安全通道，通常与 arc 组合；--bare 下必须用无 OS 的自旋实现",
+          "example": "let m = mutex(0)"
+        },
+        {
+          "index": 44,
+          "word": "wait",
+          "kind": "identifier",
+          "category": "并发",
+          "position": 8,
+          "form": "wait 句柄；wait 任务组",
+          "semantic": "等待 task/thread/等待组完成并取回结果；返回 res[T, error]（任务 panic 转成 err）；被取消的任务在 wait 处返回 err(Cancelled)",
+          "example": "let r = wait t"
+        }
+      ]
+    },
+    {
+      "name": "内存",
+      "count": 9,
+      "keywords": [
+        {
+          "index": 45,
+          "word": "raw",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 1,
+          "form": "类型位置 raw",
+          "semantic": "无类型、无对齐信息、非拥有的字节地址（对应 C void*）：不可解引用、不可算术，只能 as 转换或传给 extern；是 FFI 与分配器的边界类型",
+          "example": "extern \"C\" fn memset(p: raw, c: u8, n: usize) -> raw"
+        },
+        {
+          "index": 46,
+          "word": "free",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 2,
+          "form": "free 指针",
+          "semantic": "释放 alloc 获得的块；对非 alloc 来源释放是未定义行为（编译期可判定则报错）；释放后指针失效，不置空",
+          "example": "free(p)"
+        },
+        {
+          "index": 47,
+          "word": "alloc",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 3,
+          "form": "alloc(字节数, 对齐) -> ptr[u8]",
+          "semantic": "从当前分配器分配未初始化裸块（不构造值、不调 drop）；--bare 下必须先注册分配器（@allocator），否则链接错误",
+          "example": "let p = alloc(64, 8)"
+        },
+        {
+          "index": 48,
+          "word": "rc",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 4,
+          "form": "rc[T]；rc(值)",
+          "semantic": "非原子引用计数智能指针：clone() 增计数，最后一份释放时按要求调用 drop；!Send，不可跨线程",
+          "example": "let a = rc(Point(x: 1, y: 2))"
+        },
+        {
+          "index": 49,
+          "word": "arc",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 5,
+          "form": "arc[T]；arc(值)",
+          "semantic": "原子引用计数智能指针：T: Send + Sync 时整体 Send + Sync；跨线程共享所有权，通常包 mutex 使用",
+          "example": "let a = arc(mutex(0))"
+        },
+        {
+          "index": 50,
+          "word": "gc",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 6,
+          "form": "gc[T]；gc(值)",
+          "semantic": "GC 托管的堆对象：仅当 --gc 不为 none 且处于 --app 模式可用；--bare 下使用是编译错误；GC 对象不参与确定性析构（drop 至多调一次）",
+          "example": "let node = gc(Node(next: none))"
+        },
+        {
+          "index": 51,
+          "word": "ptr",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 7,
+          "form": "ptr[T]；ptr mut T",
+          "semantic": "带类型原始指针：解引用需 @unsafe；ptr + 整数 运算需 @unsafe；可空性用 opt[ptr[T]]；不参与借用检查，不与 ref 混用",
+          "example": "@unsafe { let v = *p }"
+        },
+        {
+          "index": 52,
+          "word": "ref",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 8,
+          "form": "ref T；ref mut T",
+          "semantic": "借用引用（非拥有）：受所有权与别名规则约束（同一时刻 1×ref mut 或 N×ref）；宽度同指针；不能逃逸出被借用值的生命周期",
+          "example": "fn len(s: ref [i32]) -> usize"
+        },
+        {
+          "index": 53,
+          "word": "mut",
+          "kind": "identifier",
+          "category": "内存",
+          "position": 9,
+          "form": "ref mut T；ptr mut T；mut self；mut 参数",
+          "semantic": "可变性修饰：只用于借用、指针与接收者，表示\"可写视图\"；变量本身的可变性由 var 声明，因此不存在 let mut 写法",
+          "example": "fn clear(mut self) { }"
+        }
+      ]
+    },
+    {
+      "name": "裸机",
+      "count": 7,
+      "keywords": [
+        {
+          "index": 54,
+          "word": "@",
+          "kind": "symbol",
+          "category": "裸机",
+          "position": 1,
+          "form": "@属性；@属性(参数)；@属性 { ... }",
+          "semantic": "属性/注解前缀，可作用于项、语句、类型与表达式；内建属性：@inline @no_mangle @entry @section(\"..\") @at(地址) @irq(向量) @repr(C) @packed @align(n) @volatile @unsafe @allocator；@unsafe { } 是**不安全块**（解引用 ptr、asm、访问 static mut、volatile 读写、goto 目标校验之外的指针算术必须位于其中）；attr 声明的自定义属性同样以 @ 使用",
+          "example": "@inline fn hot() {}"
+        },
+        {
+          "index": 55,
+          "word": "asm",
+          "kind": "identifier",
+          "category": "裸机",
+          "position": 2,
+          "form": "asm \"模板\"；asm { \"模板\", out(..), in(..), clobber(\"..\") }",
+          "semantic": "内联汇编：必须位于 @unsafe 上下文；asm 可作为表达式产出寄存器值（out 绑定）；模板原样交给目标汇编器，不做转义；--bare 下始终可用，wasm 目标下是编译错误",
+          "example": "@unsafe { asm \"nop\" }"
+        },
+        {
+          "index": 56,
+          "word": "volatile",
+          "kind": "identifier",
+          "category": "裸机",
+          "position": 3,
+          "form": "类型位置 volatile 类型；属性 @volatile",
+          "semantic": "易失访问修饰：作用于 ptr/raw，读写不可被优化、合并、消除或重排；用于 MMIO 寄存器；对非指针类型使用是编译错误",
+          "example": "let reg: volatile ptr[u32] = 0x4000_0000 as volatile ptr[u32]"
+        },
+        {
+          "index": 57,
+          "word": "at",
+          "kind": "identifier",
+          "category": "裸机",
+          "position": 4,
+          "form": "项声明尾部 ... at 常量地址；等价属性 @at(常量地址)",
+          "semantic": "地址放置子句：把 static/fn 放到固定地址（由链接脚本转成段+偏移）；只允许常量地址；与 --bare 配合",
+          "example": "fn reset() at 0x0000_0000 { }"
+        },
+        {
+          "index": 58,
+          "word": "irq",
+          "kind": "identifier",
+          "category": "裸机",
+          "position": 5,
+          "form": "irq fn 名(参数) { ... }；配合 @irq(向量号)",
+          "semantic": "声明中断服务例程：dscc 生成上下文保存/恢复与中断返回序列；ISR 内禁止阻塞原语（wait/recv/send/mutex.lock）；向量号用 @irq(n) 绑定或由中断表 @irq_table 统一注册",
+          "example": "@irq(5) irq fn timer_tick() { }"
+        },
+        {
+          "index": 59,
+          "word": "section",
+          "kind": "identifier",
+          "category": "裸机",
+          "position": 6,
+          "form": "section \"段名\" { 项... }",
+          "semantic": "段放置块：块内所有项进入指定链接段（.boot/.text/.rodata/.bss 等）；段名原样交给链接器；--app 下同样生效（自定义段）",
+          "example": "section \".boot\" { fn _start() { } }"
+        },
+        {
+          "index": 60,
+          "word": "packed",
+          "kind": "identifier",
+          "category": "裸机",
+          "position": 7,
+          "form": "packed type 名 { ... }；等价属性 @packed",
+          "semantic": "紧凑布局：无填充，alignof(T) == 1（除非另加 @align(n)）；非对齐字段访问由 dscc 生成逐字节序列，或按目标能力产出单指令",
+          "example": "packed type Header { magic: u16, len: u32 }"
+        }
+      ]
+    },
+    {
+      "name": "元编程",
+      "count": 4,
+      "keywords": [
+        {
+          "index": 61,
+          "word": "comptime",
+          "kind": "identifier",
+          "category": "元编程",
+          "position": 1,
+          "form": "comptime 表达式；comptime { ... }；comptime fn；comptime if/comptime for",
+          "semantic": "编译期求值域：内部代码在编译期执行，结果内联；comptime fn 可在类型、常量、宏与布局属性中调用；comptime if 分支在编译期选定，未选分支不参与类型检查；块内禁止 asm/extern/I/O",
+          "example": "comptime if sizeof(T) > 8 { ... }"
+        },
+        {
+          "index": 62,
+          "word": "macro",
+          "kind": "identifier",
+          "category": "元编程",
+          "position": 2,
+          "form": "macro 名(参数: 语法片段) { 模板 }",
+          "semantic": "语法宏：解析期展开、默认卫生（模板内新标识符不与调用点冲突）；片段类型为 expr/type/pat/stmt/block/ident/lit；与 comptime fn 分工——macro 操作语法，comptime fn 操作值/类型",
+          "example": "macro unless(c: expr, b: block) { if !c { b } }"
+        },
+        {
+          "index": 63,
+          "word": "typeinfo",
+          "kind": "identifier",
+          "category": "元编程",
+          "position": 3,
+          "form": "typeinfo(类型)；typeinfo::of(表达式)",
+          "semantic": "编译期类型反射：返回 TypeInfo（字段 name/size/align/fields/traits/kind）；comptime 中完全可用；运行期保留需 --rt full，否则是编译错误",
+          "example": "comptime let n = typeinfo(T).name"
+        },
+        {
+          "index": 64,
+          "word": "attr",
+          "kind": "identifier",
+          "category": "元编程",
+          "position": 4,
+          "form": "attr 名(目标: 属性目标) { 参数... }",
+          "semantic": "声明自定义属性：目标 ∈ fn/type/class/field/static/mod/stmt/expr；声明后以 @名(参数) 使用；属性值由 comptime 代码读取，编译器不解释语义",
+          "example": "attr doc(target: fn) { text: str }"
+        }
+      ]
+    },
+    {
+      "name": "OOP",
+      "count": 6,
+      "keywords": [
+        {
+          "index": 65,
+          "word": "self",
+          "kind": "identifier",
+          "category": "OOP",
+          "position": 1,
+          "form": "self；ref self；mut self；self.字段；self.方法()",
+          "semantic": "方法接收者：class/impl 方法的隐式首参，不可重命名、不可作自由变量；mut self 表示可变借用接收者；class 的 self 是引用语义，type/impl 的 self 是值语义（可 ref 借用）",
+          "example": "fn area(self) -> f32 { self.w * self.h }"
+        },
+        {
+          "index": 66,
+          "word": "super",
+          "kind": "identifier",
+          "category": "OOP",
+          "position": 2,
+          "form": "super.方法(参数)；super.init(参数)",
+          "semantic": "访问父类实现：仅 class ... extends 内部合法；用于调用被覆盖的方法或基类构造器；不可作为值传递、不可跳级",
+          "example": "super.init(name)"
+        },
+        {
+          "index": 67,
+          "word": "new",
+          "kind": "identifier",
+          "category": "OOP",
+          "position": 3,
+          "form": "new(参数) { ... }；类型.new(参数)",
+          "semantic": "构造器：class 体内的 new 声明构造逻辑并返回实例，外部写 类型.new(...)，必须直接或经 super.init 初始化基类；type 的默认构造是值构造 名(字段: 值, ...)，impl 中的 new 是额外命名构造器（同样以 类型.new(...) 调用）",
+          "example": "let p = Point(x: 1, y: 2)"
+        },
+        {
+          "index": 68,
+          "word": "drop",
+          "kind": "identifier",
+          "category": "OOP",
+          "position": 4,
+          "form": "drop(self) { ... }",
+          "semantic": "析构器：值离开作用域、容器销毁或 rc/arc 计数归零时确定性调用一次；执行后字段按声明逆序销毁；析构器内不可 panic（编译错误）",
+          "example": "drop(self) { free(self.buf) }"
+        },
+        {
+          "index": 69,
+          "word": "extends",
+          "kind": "identifier",
+          "category": "OOP",
+          "position": 5,
+          "form": "class 子类 extends 父类 { ... }",
+          "semantic": "单继承子句：一个类至多一个父类；继承字段、方法与虚派表；接口组合用 impl trait for class，不支持多继承",
+          "example": "class Dog extends Animal { }"
+        },
+        {
+          "index": 70,
+          "word": "dyn",
+          "kind": "identifier",
+          "category": "OOP",
+          "position": 6,
+          "form": "dyn Trait",
+          "semantic": "动态派发 trait 对象类型（两字宽胖指针：数据指针 + vtable）；dyn 值必须经 ref/rc/arc/gc 持有；由实现值经 as dyn Trait 装箱得到",
+          "example": "let d: rc[dyn Draw] = rc(Circle.new()) as rc[dyn Draw]"
+        }
+      ]
+    },
+    {
+      "name": "模式",
+      "count": 7,
+      "keywords": [
+        {
+          "index": 71,
+          "word": "match",
+          "kind": "identifier",
+          "category": "模式",
+          "position": 1,
+          "form": "match 表达式 { 模式 => 分支, ... }",
+          "semantic": "模式匹配表达式：分支须穷尽（_ 兜底）；按书写顺序试探，when 守卫不满足则继续下一分支；分支体可为块",
+          "example": "match o { some(v) => v, none => 0 }"
+        },
+        {
+          "index": 72,
+          "word": "when",
+          "kind": "identifier",
+          "category": "模式",
+          "position": 2,
+          "form": "模式 when 条件 => 分支",
+          "semantic": "匹配守卫：模式绑定成功后求值条件，为真才采用该分支；守卫中可见模式绑定变量；只出现在 match 分支中",
+          "example": "n when n % 2 == 0 => \"even\""
+        },
+        {
+          "index": 73,
+          "word": "where",
+          "kind": "identifier",
+          "category": "模式",
+          "position": 3,
+          "form": "fn f[T](..) where T: Trait + Trait2 { }",
+          "semantic": "泛型约束子句：在参数表之后、返回类型/函数体之前声明 trait 约束与生命周期约束；可用于 fn/impl/type/trait",
+          "example": "fn show[T](x: T) where T: Draw { }"
+        },
+        {
+          "index": 74,
+          "word": "in",
+          "kind": "identifier",
+          "category": "模式",
+          "position": 4,
+          "form": "for 模式 in 可迭代；表达式 in 容器",
+          "semantic": "双用途：for 头的迭代子句；表达式位置的成员测试（数组/切片/映射），返回 bool",
+          "example": "if key in map { }"
+        },
+        {
+          "index": 75,
+          "word": "is",
+          "kind": "identifier",
+          "category": "模式",
+          "position": 5,
+          "form": "表达式 is 类型；表达式 is 模式(绑定)",
+          "semantic": "类型/模式测试表达式，返回 bool；if x is Circle(c) { } 在真分支把 c 绑定为解构结果；右操作数必须是类型或模式",
+          "example": "if v is u32 { }"
+        },
+        {
+          "index": 76,
+          "word": "sizeof",
+          "kind": "identifier",
+          "category": "模式",
+          "position": 6,
+          "form": "sizeof(类型)；sizeof(表达式)",
+          "semantic": "编译期常量（usize）：类型的字节大小；传表达式时取其静态类型；泛型中按单态化后的实际类型求值",
+          "example": "comptime let n = sizeof(u64)"
+        },
+        {
+          "index": 77,
+          "word": "alignof",
+          "kind": "identifier",
+          "category": "模式",
+          "position": 7,
+          "form": "alignof(类型)",
+          "semantic": "编译期常量（usize）：类型的最小对齐；packed 类型为 1；可与 @align(n) 组合推导",
+          "example": "@align(alignof(u64))"
+        }
+      ]
+    }
+  ],
+  "alphabetical": [
+    {
+      "word": "->",
+      "category": "管道",
+      "kind": "symbol"
+    },
+    {
+      "word": "=>",
+      "category": "管道",
+      "kind": "symbol"
+    },
+    {
+      "word": "@",
+      "category": "裸机",
+      "kind": "symbol"
+    },
+    {
+      "word": "alignof",
+      "category": "模式",
+      "kind": "identifier"
+    },
+    {
+      "word": "alloc",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "arc",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "as",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "asm",
+      "category": "裸机",
+      "kind": "identifier"
+    },
+    {
+      "word": "assert",
+      "category": "错误",
+      "kind": "identifier"
+    },
+    {
+      "word": "at",
+      "category": "裸机",
+      "kind": "identifier"
+    },
+    {
+      "word": "attr",
+      "category": "元编程",
+      "kind": "identifier"
+    },
+    {
+      "word": "break",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "catch",
+      "category": "错误",
+      "kind": "identifier"
+    },
+    {
+      "word": "chan",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "class",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "comptime",
+      "category": "元编程",
+      "kind": "identifier"
+    },
+    {
+      "word": "continue",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "drop",
+      "category": "OOP",
+      "kind": "identifier"
+    },
+    {
+      "word": "dyn",
+      "category": "OOP",
+      "kind": "identifier"
+    },
+    {
+      "word": "else",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "export",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "extends",
+      "category": "OOP",
+      "kind": "identifier"
+    },
+    {
+      "word": "extern",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "fn",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "for",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "free",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "gc",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "go",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "goto",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "if",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "impl",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "in",
+      "category": "模式",
+      "kind": "identifier"
+    },
+    {
+      "word": "irq",
+      "category": "裸机",
+      "kind": "identifier"
+    },
+    {
+      "word": "is",
+      "category": "模式",
+      "kind": "identifier"
+    },
+    {
+      "word": "let",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "loop",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "macro",
+      "category": "元编程",
+      "kind": "identifier"
+    },
+    {
+      "word": "match",
+      "category": "模式",
+      "kind": "identifier"
+    },
+    {
+      "word": "mod",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "mut",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "mutex",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "new",
+      "category": "OOP",
+      "kind": "identifier"
+    },
+    {
+      "word": "opt",
+      "category": "错误",
+      "kind": "identifier"
+    },
+    {
+      "word": "package",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "packed",
+      "category": "裸机",
+      "kind": "identifier"
+    },
+    {
+      "word": "panic",
+      "category": "错误",
+      "kind": "identifier"
+    },
+    {
+      "word": "priv",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "prot",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "ptr",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "pub",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "raw",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "rc",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "recover",
+      "category": "错误",
+      "kind": "identifier"
+    },
+    {
+      "word": "recv",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "ref",
+      "category": "内存",
+      "kind": "identifier"
+    },
+    {
+      "word": "res",
+      "category": "错误",
+      "kind": "identifier"
+    },
+    {
+      "word": "return",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "section",
+      "category": "裸机",
+      "kind": "identifier"
+    },
+    {
+      "word": "self",
+      "category": "OOP",
+      "kind": "identifier"
+    },
+    {
+      "word": "send",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "sizeof",
+      "category": "模式",
+      "kind": "identifier"
+    },
+    {
+      "word": "spawn",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "static",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "super",
+      "category": "OOP",
+      "kind": "identifier"
+    },
+    {
+      "word": "thread",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "trait",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "try",
+      "category": "错误",
+      "kind": "identifier"
+    },
+    {
+      "word": "type",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "typeinfo",
+      "category": "元编程",
+      "kind": "identifier"
+    },
+    {
+      "word": "use",
+      "category": "模块",
+      "kind": "identifier"
+    },
+    {
+      "word": "var",
+      "category": "定义",
+      "kind": "identifier"
+    },
+    {
+      "word": "volatile",
+      "category": "裸机",
+      "kind": "identifier"
+    },
+    {
+      "word": "wait",
+      "category": "并发",
+      "kind": "identifier"
+    },
+    {
+      "word": "when",
+      "category": "模式",
+      "kind": "identifier"
+    },
+    {
+      "word": "where",
+      "category": "模式",
+      "kind": "identifier"
+    },
+    {
+      "word": "while",
+      "category": "控制",
+      "kind": "identifier"
+    },
+    {
+      "word": "|>",
+      "category": "管道",
+      "kind": "symbol"
+    }
+  ],
+  "operators": [
+    {
+      "op": "+",
+      "index": 1
+    },
+    {
+      "op": "-",
+      "index": 2
+    },
+    {
+      "op": "*",
+      "index": 3
+    },
+    {
+      "op": "/",
+      "index": 4
+    },
+    {
+      "op": "%",
+      "index": 5
+    },
+    {
+      "op": "=",
+      "index": 6
+    },
+    {
+      "op": "==",
+      "index": 7
+    },
+    {
+      "op": "!=",
+      "index": 8
+    },
+    {
+      "op": "<",
+      "index": 9
+    },
+    {
+      "op": ">",
+      "index": 10
+    },
+    {
+      "op": "<=",
+      "index": 11
+    },
+    {
+      "op": ">=",
+      "index": 12
+    },
+    {
+      "op": "!",
+      "index": 13
+    },
+    {
+      "op": "&&",
+      "index": 14
+    },
+    {
+      "op": "||",
+      "index": 15
+    },
+    {
+      "op": "&",
+      "index": 16
+    },
+    {
+      "op": "|",
+      "index": 17
+    },
+    {
+      "op": "^",
+      "index": 18
+    },
+    {
+      "op": "~",
+      "index": 19
+    },
+    {
+      "op": "<<",
+      "index": 20
+    },
+    {
+      "op": ">>",
+      "index": 21
+    },
+    {
+      "op": ".",
+      "index": 22
+    },
+    {
+      "op": "[]",
+      "index": 23
+    },
+    {
+      "op": "|>",
+      "index": 24
+    },
+    {
+      "op": "->",
+      "index": 25
+    },
+    {
+      "op": "=>",
+      "index": 26
+    }
+  ],
+  "dscc": {
+    "positional": "input.ds",
+    "options": [
+      "-o <path>",
+      "--app",
+      "--bare",
+      "--target <triple>",
+      "--opt <level>",
+      "--gc <mode>",
+      "--rt <kind>"
+    ],
+    "canonical": [
+      "input.ds",
+      "-o",
+      "--app",
+      "--bare",
+      "--target",
+      "--opt",
+      "--gc",
+      "--rt"
+    ]
+  },
+  "literals": [
+    "5",
+    "-3",
+    "0xFF",
+    "0b1010",
+    "\"str\"",
+    "b\"raw\"",
+    "[1 2]",
+    "{k:v}",
+    "_"
+  ],
+  "comments": [
+    "#",
+    "//",
+    "#|",
+    "|#"
+  ]
+}
+```
+
+## 6. 数据集统计
+
+# Ds v0.1 AI 数据集统计
+
+| 数据 | 条数 | 用途 |
+|---|---|---|
+| `ds_sft.jsonl` | 32 | 指令微调（system + user + assistant，含 ```ds 代码） |
+| `ds_corpus.jsonl` | 10 | 语料 / RAG（语言卡、关键词、语法、语义、FAQ） |
+| `ds_bench.jsonl` | 19 | 评测（prompt + 参考 stdout，覆盖核心特性） |
+
+- 系统提示词：`ai/system_prompt.txt`
+- 生成脚本：`tools/make_datasets.py`（bench 预期输出由参考驱动实跑生成，保证可复现）
+- 许可证：规范 CC-BY-4.0；代码与数据 MIT
+
+
+## 7. 给 Agent 的操作说明
+
+# 给 AI Agent 的 Ds v0.1 使用说明
+
+你是要使用 / 学习 / 生成 Ds v0.1 代码的 AI Agent。请按以下顺序获取上下文：
+
+1. **先读** `ai/LANGUAGE_CARD.md`（约 5k token，含全部 77 关键字、语法、语义、示例）。
+2. 需要精确细节时读 `spec/DS-v0.1.md`（完整规范，含每个关键字的形式/语义/示例）。
+3. 机器可读索引：`spec/keywords.json`（77 词 + 形式 + 语义 + 示例）。
+4. 需要作品参考：`examples/*.ds`（应用/并发/内存/裸机四个示例）。
+5. 生成代码后，**用参考驱动验证**（见下），不要凭空断言正确性。
+
+## 验证命令
+
+```bash
+python3 tools/ds_keywords.py check --json spec/keywords.json
+python3 -m unittest discover -s tests
+./dscc 你的文件.ds            # 解释执行
+./dscc 你的文件.ds --check    # 仅解析
+```
+
+## 生成约定
+
+- 文件首行：`package <名字>`（ASCII 标识符）。
+- 入口：`fn main() { ... }`。
+- 只用规范中的 77 个硬关键字；不要发明关键字。
+- 遵循关键消歧规则：泛型用 `[]`、空映射 `{:}`、类用 `.new(...)` 构造、`->`/`=>`/`|>` 分工。
+- 若必须与外部符号同名，用反引号原始标识符 `` `name` ``。
+- 输出示例时使用 ```ds 代码块。
+
+## 不要做
+
+- 不要把 Ds 与 Rust/C++/Go 的语法混用（例如 `struct`/`const`/`let mut`/`<>` 泛型/`->` 当 lambda）。
+- 不要声称未实现的功能可直接运行；0.1 是定义稿 + 参考驱动（核心子集）。
+

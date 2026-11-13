@@ -693,6 +693,29 @@ def make_prelude(interp) -> dict[str, Any]:
     def _panic(args, kwargs):
         raise DsPanic(args[0] if args else "panic")
 
+    def _len(args, kwargs):
+        if len(args) != 1:
+            raise DsRuntimeError("len 需要 1 个参数")
+        v = args[0]
+        if isinstance(v, (list, dict, str, bytes)):
+            return len(v)
+        raise DsRuntimeError(f"len 不支持 {type(v).__name__}")
+
+    def _to_str(args, kwargs):
+        if len(args) != 1:
+            raise DsRuntimeError("str 需要 1 个参数")
+        return to_str(args[0])
+
+    def _abs(args, kwargs):
+        if len(args) != 1:
+            raise DsRuntimeError("abs 需要 1 个参数")
+        return abs(args[0])
+
+    def _pow(args, kwargs):
+        if len(args) != 2:
+            raise DsRuntimeError("pow 需要 2 个参数")
+        return float(args[0]) ** float(args[1])
+
     prelude: dict[str, Any] = {
         "true": True,
         "false": False,
@@ -709,6 +732,10 @@ def make_prelude(interp) -> dict[str, Any]:
         "format": NativeFunction("format", _format),
         "concat": NativeFunction("concat", _concat),
         "range": NativeFunction("range", _range),
+        "len": NativeFunction("len", _len),
+        "str": NativeFunction("str", _to_str),
+        "abs": NativeFunction("abs", _abs),
+        "pow": NativeFunction("pow", _pow),
         "math": make_math_module(),
     }
     prelude.update(native_constructors(interp))

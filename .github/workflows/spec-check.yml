@@ -24,3 +24,8 @@ jobs:
           ./dscc examples/tour.ds | head -5
           ./ds -c 'package t
           fn main() { println("cli ok") }'
+      - name: AI 学习包校验
+        run: |
+          python3 tools/make_datasets.py --check
+          python3 tools/build_ai_kit.py --check
+          python3 tools/ds_bench.py --list > /dev/null
