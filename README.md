@@ -1,6 +1,22 @@
 # Ds v0.1 — 新编程语言定义（全量关键词表）
 
+[![CI](https://github.com/yzxcrush/ds/actions/workflows/spec-check.yml/badge.svg)](https://github.com/yzxcrush/ds/actions/workflows/spec-check.yml)
+[![Android APK](https://img.shields.io/badge/Android-APK%20v0.1.4-2b5278)](https://github.com/yzxcrush/ds-compiler/releases/latest)
+
 > **定义 + 可执行参考驱动**：本仓库给出 Ds v0.1 的完整定位、词法、**77 项全量关键词表**、运算符、字面量、注释、EBNF、语义契约与 `dscc` 编译驱动定义，并附带 **Python 参考驱动**（词法器 → 解析器 → 树遍历解释器）与 `ds` / `dscc` 终端命令。**不产出机器码**，语言规范本身仍是定义稿。
+
+## 为什么是 Ds？
+
+一套语言覆盖 **应用 / 系统 / 裸机**，三档写法把 AI 生成成本压到最低，且每一步都能被三套参考实现执行验证：
+
+- **一套语义三种交付**：`--app` 应用、`--bare` 裸机、7 个交叉编译目标
+- **能力密度**：77 硬关键字覆盖类型/内存/错误/并发/元编程/OOP/模式/裸机
+- **Token 效率**：常见程序 经典 137 → 精简 82（-31%）→ Flow 69（**-49%**）
+- **可预测**：显式内存五选一、确定性析构、错误分层、结构化并发、布局可控
+- **AI 原生**：llms.txt + 语言卡 + 41 条 SFT + 25 项评测 + Python/C/App 三实现可对拍
+- **不是换皮**：Flow（`\` 定义 + 并置调用 + `.` 结束块）不属于任何主流编译语言语法家族
+
+完整阐述（含与 Python/Rust/Go/C++ 的客观对比与适用范围）：[docs/WHY-DS.md](docs/WHY-DS.md)
 
 ## 一键校验
 

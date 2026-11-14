@@ -33,6 +33,7 @@ def build() -> str:
     card = read("ai/LANGUAGE_CARD.md")
     concise = read("spec/DS-CONCISE.md")
     flow = read("spec/DS-FLOW.md")
+    why = read("docs/WHY-DS.md")
     spec = read("spec/DS-v0.1.md")
     llms = read("llms.txt")
     keywords = read("spec/keywords.json")
@@ -61,6 +62,10 @@ def build() -> str:
         "## 2b. Flow 写法（结构性最省 token）",
         "",
         flow,
+        "",
+        "## 2a. 为什么是 Ds（优势与边界）",
+        "",
+        why,
         "",
         "## 2c. Language Card",
         "",
