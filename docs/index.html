@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ds — a compact systems language for predictable code and AI generation</title>
+<meta name="description" content="Ds is a compact systems language with 77 hard keywords, one semantics for app/systems/bare-metal targets, and three interchangeable syntaxes (classic, concise, Flow) that cut AI token usage by up to 49%. Ships with an AI learning kit and reference implementations.">
+<link rel="canonical" href="https://yzxcrush.github.io/ds/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Ds — compact systems language, token-efficient for AI">
+<meta property="og:description" content="77 keywords · 3 syntaxes · 7 targets · 3 reference implementations. App to bare-metal in one language.">
+<meta property="og:url" content="https://yzxcrush.github.io/ds/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="style.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Ds","programmingLanguage":"Ds",
+ "codeRepository":"https://github.com/yzxcrush/ds",
+ "description":"Compact systems language with 77 hard keywords and three interchangeable syntaxes."}
+</script>
+</head>
+<body>
+<header class="nav">
+  <a class="brand" href="./"><span class="logo">Ds</span><span class="brand-name">Ds</span></a>
+  <nav class="links">
+    <a href="#why">Why Ds</a>
+    <a href="#syntax">Syntax</a>
+    <a href="#ai">For AI</a>
+    <a href="#android">Android</a>
+    <a href="https://github.com/yzxcrush/ds">GitHub ↗</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow">v0.1 · definition-first · MIT + CC-BY-4.0</p>
+    <h1>One language.<br><span class="grad">App, systems, bare-metal.</span></h1>
+    <p class="lede">
+      <b>Ds</b> is a compact systems language: <b>77 hard keywords</b>, one semantics for
+      <code>--app</code> and <code>--bare</code> targets, and <b>three interchangeable syntaxes</b>
+      that cut AI generation cost by up to <b>49%</b>.
+      Not a re-skin of C/Java/Python/Rust/Go.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/yzxcrush/ds">GitHub repository</a>
+      <a class="btn" href="https://github.com/yzxcrush/ds-compiler/releases/latest">Android APK</a>
+      <a class="btn ghost" href="https://raw.githubusercontent.com/yzxcrush/ds/main/llms.txt">llms.txt</a>
+    </div>
+    <div class="stats">
+      <div><b>77</b><span>hard keywords</span></div>
+      <div><b>3</b><span>syntaxes / 1 AST</span></div>
+      <div><b>7</b><span>compile targets</span></div>
+      <div><b>3</b><span>reference impls</span></div>
+      <div><b>158</b><span>tests, CI green</span></div>
+    </div>
+  </section>
+
+  <section id="why" class="section">
+    <h2>Why Ds</h2>
+    <div class="grid">
+      <article class="card"><h3>One language, three deliverables</h3>
+        <p>Write apps (<code>--app</code>), systems code and bare-metal firmware (<code>--bare</code>) with the same
+        types, errors, memory and concurrency rules. 7 targets incl. <code>thumbv7em-none-eabi</code>,
+        <code>riscv32-none-elf</code>, <code>wasm32</code>.</p></article>
+      <article class="card"><h3>Capability density</h3>
+        <p>Types, five explicit memory strategies, layered errors, 8 concurrency primitives, 4-stage
+        metaprogramming, OOP + traits, pattern matching and bare-metal placement — all first-class keywords,
+        not library layers.</p></article>
+      <article class="card"><h3>Token efficiency</h3>
+        <p>Classic 137 → concise 82 (−31%) → <b>Flow 69 (−49%)</b> tokens on common programs.
+        Same AST, byte-identical behaviour. Flow uses <code>\</code> definitions, juxtaposition calls and
+        <code>.</code> block terminators.</p></article>
+      <article class="card"><h3>Predictability</h3>
+        <p>Static types, no implicit conversions, deterministic <code>drop</code>, error layering
+        (<code>res</code>/<code>opt</code> → <code>panic</code> → <code>assert</code>), structured concurrency,
+        layout control (<code>sizeof</code>/<code>alignof</code>/<code>packed</code>), explicit <code>@unsafe</code>.</p></article>
+      <article class="card"><h3>AI-native, not prompt-only</h3>
+        <p><code>llms.txt</code>, a 5k-token language card, 41 SFT rows, 25 benchmark tasks, an auto-grader and
+        three implementations cross-checked by differential tests. Generated code can be executed and scored
+        immediately.</p></article>
+      <article class="card"><h3>Not a re-skin</h3>
+        <p>Flow's combination of <code>\</code> sigils, whitespace application and dot-terminated blocks belongs
+        to no mainstream compiled-language syntax family. Three surfaces, one semantics.</p></article>
+    </div>
+  </section>
+
+  <section id="syntax" class="section">
+    <h2>Three syntaxes, one AST</h2>
+    <p class="muted">The same program. Pick readability for humans, concision for AI, or the structural Flow form.</p>
+    <div class="cols">
+      <div class="code"><div class="code-title">classic · 13 tokens</div><pre><code>package hello
+
+fn main() {
+    println("hello, Ds")
+}</code></pre></div>
+      <div class="code"><div class="code-title">0.1c concise · 5 tokens</div><pre><code>println("hello, Ds")</code></pre></div>
+      <div class="code"><div class="code-title">Flow · 3 tokens</div><pre><code>p "hello, Ds"</code></pre></div>
+    </div>
+    <table class="tokens">
+      <thead><tr><th>Program</th><th>classic</th><th>0.1c</th><th>Flow</th><th>vs classic</th></tr></thead>
+      <tbody>
+        <tr><td>hello world</td><td>13</td><td>5</td><td><b>3</b></td><td>−76%</td></tr>
+        <tr><td>Fibonacci ×10</td><td>64</td><td>38</td><td><b>34</b></td><td>−46%</td></tr>
+        <tr><td>sum + calls</td><td>60</td><td>39</td><td><b>32</b></td><td>−46%</td></tr>
+        <tr class="total"><td>total</td><td>137</td><td>82</td><td><b>69</b></td><td><b>−49%</b></td></tr>
+      </tbody>
+    </table>
+    <p class="muted">Reproduce: <code>python3 tools/token_report.py</code></p>
+  </section>
+
+  <section id="ai" class="section">
+    <h2>For AI agents</h2>
+    <div class="grid two">
+      <article class="card"><h3>Read</h3>
+        <ul>
+          <li><a href="https://raw.githubusercontent.com/yzxcrush/ds/main/llms.txt">llms.txt</a> — index</li>
+          <li><a href="https://raw.githubusercontent.com/yzxcrush/ds/main/ai/LANGUAGE_CARD.md">language card</a> — 5k tokens, complete keyword table</li>
+          <li><a href="https://raw.githubusercontent.com/yzxcrush/ds/main/ai/llms-full.txt">llms-full.txt</a> — ~143 KB full context</li>
+          <li><a href="https://github.com/yzxcrush/ds/blob/main/spec/DS-v0.1.md">spec</a> · <a href="https://github.com/yzxcrush/ds/blob/main/spec/DS-CONCISE.md">concise</a> · <a href="https://github.com/yzxcrush/ds/blob/main/spec/DS-FLOW.md">Flow</a></li>
+        </ul></article>
+      <article class="card"><h3>Train &amp; evaluate</h3>
+        <ul>
+          <li><code>datasets/ds_sft.jsonl</code> — 41 instruction rows</li>
+          <li><code>datasets/ds_corpus.jsonl</code> — 10 documents</li>
+          <li><code>datasets/ds_bench.jsonl</code> — 25 graded tasks</li>
+          <li><code>python3 tools/ds_bench.py --submissions sub.jsonl</code></li>
+        </ul></article>
+    </div>
+  </section>
+
+  <section id="android" class="section">
+    <h2>Ds Compiler for Android</h2>
+    <div class="card wide">
+      <p>Telegram-style chat console, Pydroid-like editor, fully offline. Kernel 0.2.0 supports classic,
+      0.1c concise and Flow syntaxes. Built by GitHub Actions on every push.</p>
+      <p><a class="btn primary" href="https://github.com/yzxcrush/ds-compiler/releases/latest">Download APK</a>
+      <a class="btn ghost" href="https://github.com/yzxcrush/ds-compiler">Repository</a></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Status &amp; scope</h2>
+    <div class="card wide">
+      <p><b>v0.1 is definition-first.</b> It ships a full spec, three reference implementations
+      (Python, C core subset, Android kernel), differential tests and an AI learning kit.
+      There is <b>no package manager, standard library ecosystem or production tooling yet</b>.
+      Great for language design/teaching, prototyping, and AI-generation pipelines — not a production
+      replacement for Python/Rust/Go/C++.</p>
+      <p><a href="https://github.com/yzxcrush/ds/blob/main/docs/WHY-DS.md">Read the honest comparison →</a></p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div>Ds v0.1 · <a href="https://github.com/yzxcrush/ds">GitHub</a> ·
+    <a href="https://github.com/yzxcrush/ds/blob/main/docs/WHY-DS.md">Why Ds</a> ·
+    <a href="https://github.com/yzxcrush/ds/blob/main/README.en.md">English README</a> ·
+    <a href="llms.txt">llms.txt</a></div>
+  <div class="muted">Specs CC-BY-4.0 · Code MIT</div>
+</footer>
+</body>
+</html>

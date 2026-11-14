@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://yzxcrush.github.io/ds/sitemap.xml
