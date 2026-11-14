@@ -92,6 +92,13 @@ class Emitter:
         if isinstance(body, ast.Expr):
             self.expr(body, ctx)
             self.emit(f"  jmp {ctx.ret_label}")
+        elif (isinstance(body, ast.Block) and body.stmts
+              and isinstance(body.stmts[-1], ast.ExprStmt)):
+            # 函数尾表达式是返回值：先执行前面的语句，最后保留 %rax
+            for s in body.stmts[:-1]:
+                self.stmt(s, ctx)
+            self.expr(body.stmts[-1].expr, ctx)
+            self.emit(f"  jmp {ctx.ret_label}")
         else:
             self.stmt(body, ctx)
         self.emit("  xorl %eax, %eax", f"{ctx.ret_label}:", "  leave", "  ret", "")
