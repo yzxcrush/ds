@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Ds+ 严格超集校验器（Step 4）。
+
+静态检查 S1–S12；--compile 追加 S13：用 base 编译器跑 base 示例。
+退出码：0 = 全部通过；1 = 有失败。
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+CORE = ROOT / "ds-core"
+
+
+def load(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
+
+
+def checks(compile_base: bool = False):
+    out = []
+
+    def add(sid, name, ok, detail):
+        out.append({"id": sid, "name": name, "ok": bool(ok), "detail": detail})
+
+    version = load(CORE / "version.json")
+    plus = load(CORE / "plus.keywords.json")
+    registry = load(CORE / "keywords.registry.json")
+    snapshot = load(CORE / "base.keywords.snapshot.json")
+    spec = load(ROOT / "spec" / "keywords.json")
+    abi = load(CORE / "abi" / "abi.json")
+    ir = load(CORE / "ir" / "ir.schema.json")
+    codes = load(CORE / "diagnostics" / "codes.json")
+
+    # S1 版本同步
+    ok = (version["version"] == plus["version"] == registry["version"])
+    add("S1", "版本同步", ok, f"version={version['version']}, plus={plus['version']}, registry={registry['version']}")
+
+    # S2 base 77 冻结
+    base_words = sorted(e["word"] for e in spec["alphabetical"])
+    ok = (spec["totals"]["keywords"] == 77 and base_words == sorted(snapshot["words"]))
+    add("S2", "base 77 关键字冻结", ok, f"spect={spec['totals']['keywords']}, snapshot={snapshot['count']}")
+
+    # S3 注册表与源一致
+    r = _run([sys.executable, str(CORE / "tools" / "build_registry.py"), "--check"])
+    add("S3", "注册表可重现", r.returncode == 0, (r.stdout or r.stderr).strip())
+
+    # S4 plus 全部 @ 前缀且与 base 不相交
+    plus_tokens = [e["name"] for e in plus["keywords"]]
+    ok = all(t.startswith("@") for t in plus_tokens) and not (set(plus_tokens) & set(base_words))
+    add("S4", "plus 令牌 @ 前缀 / 与 base 不相交", ok, f"{len(plus_tokens)} tokens")
+
+    # S5 合并注册表计数
+    ok = (registry["base_count"] == 77 and registry["plus_count"] == len(plus_tokens)
+          and registry["total"] == 77 + len(plus_tokens))
+    add("S5", "合并注册表 77 + N", ok, f"total={registry['total']}")
+
+    # S6 三档写法共享 AST
+    ok = (version["surfaces"] == ["classic", "concise", "flow"] and version["ast"] == "shared")
+    add("S6", "三档写法 / 同一 AST", ok, f"surfaces={version['surfaces']}, ast={version['ast']}")
+
+    # S7 ABI 默认不变、C ABI 显式
+    ok = (abi["default_layout"] == "repr(Ds)" and abi["c_layout"] == "repr(C)"
+          and "@repr(C)" in abi["c_abi_selector"])
+    add("S7", "ABI 默认 repr(Ds)，C ABI 显式", ok, abi["default_layout"])
+
+    # S8 IR 增量
+    plus_nodes = {n["name"] for n in ir["plus_nodes"]}
+    ok = {"InlineAsm", "Intrinsic", "RegionAlloc", "GlobalStatic", "RawAlloc", "MapPage"} <= plus_nodes
+    add("S8", "IR 仅增量节点", ok, f"plus_nodes={sorted(plus_nodes)}")
+
+    # S9 诊断码完整且唯一
+    all_codes = [c["code"] for c in codes["codes"]]
+    required = {e["base_stub"]["code"] for e in plus["keywords"]}
+    ok = (len(all_codes) == len(set(all_codes)) and required <= set(all_codes)
+          and {"E_DS_PLUS_PROFILE", "E_DS_PLUS_TARGET", "E_DS_PLUS_UNSAFE"} <= set(all_codes))
+    add("S9", "诊断码完整/唯一", ok, f"{len(all_codes)} codes")
+
+    # S10 base 编译器 stub 守卫
+    sys.path.insert(0, str(ROOT / "ds-plus" / "tools"))
+    import keyword_guard  # type: ignore
+    plus_hits = keyword_guard.scan_text(
+        (ROOT / "ds-plus" / "examples" / "plus_keywords.ds").read_text(encoding="utf-8"))
+    base_hits = keyword_guard.scan_text(
+        (ROOT / "examples" / "concise" / "hello.ds").read_text(encoding="utf-8"))
+    ok = len(plus_hits) == 16 and not base_hits
+    add("S10", "plus 令牌被 base stub 拦截 / base 代码干净", ok,
+        f"plus_hits={len(plus_hits)}, base_hits={len(base_hits)}")
+
+    # S11 base AI 包存在且可校验
+    ds_check = _run([sys.executable, "tools/make_datasets.py", "--check"])
+    ai_check = _run([sys.executable, "tools/build_ai_kit.py", "--check"])
+    add("S11", "AI 学习包 base 子集一致", ds_check.returncode == 0 and ai_check.returncode == 0,
+        (ds_check.stdout + ai_check.stdout).strip())
+
+    # S12 base 示例与三档写法仍在仓库中
+    needed = ["examples/concise/hello.ds", "examples/flow/hello.dsf",
+              "examples/concise/fib.ds", "examples/flow/fib.dsf"]
+    ok = all((ROOT / p).exists() for p in needed)
+    add("S12", "base 三档示例完整", ok, f"{len(needed)} files")
+
+    # S13（可选）base 编译器可编译 base 示例
+    if compile_base:
+        files = ["examples/concise/hello.ds", "examples/concise/fib.ds",
+                 "examples/flow/hello.dsf", "examples/flow/fib.dsf"]
+        detail = []
+        ok = True
+        for rel in files:
+            r = _run([str(ROOT / "dscc"), str(ROOT / rel)])
+            detail.append(f"{rel}: rc={r.returncode}")
+            ok = ok and r.returncode == 0
+        add("S13", "base 编译器可编译 base 三档示例", ok, "; ".join(detail))
+
+    return out
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description="Ds+ 严格超集校验器")
+    ap.add_argument("--compile", action="store_true", help="追加 base 编译器冒烟（S13）")
+    ap.add_argument("--json", action="store_true", help="JSON 输出")
+    args = ap.parse_args(argv)
+    results = checks(compile_base=args.compile)
+    ok = all(c["ok"] for c in results)
+    if args.json:
+        print(json.dumps({"ok": ok, "checks": results}, ensure_ascii=False, indent=2))
+    else:
+        for c in results:
+            print(f"{'✓' if c['ok'] else '✗'} {c['id']} {c['name']} — {c['detail']}")
+        print(("\n✓ Ds+ 超集校验全部通过" if ok else "\n✗ Ds+ 超集校验失败"))
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

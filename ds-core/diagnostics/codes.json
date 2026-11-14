@@ -1,0 +1,189 @@
+{
+  "version": "0.1.0",
+  "ranges": {
+    "base": "E_DS_0xxx",
+    "plus": "E_DS_PLUS_*"
+  },
+  "codes": [
+    {
+      "code": "E_DS_PLUS_ASM",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@asm",
+      "message": "@asm 是 Ds+ 关键字（汇编），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 语句（需放在 @unsafe 块内）；Ds+ 的 @asm 额外支持操作数/约束/clobber/volatile。",
+      "base_alternative": "用 Ds 的 asm 语句（需放在 @unsafe 块内）；Ds+ 的 @asm 额外支持操作数/约束/clobber/volatile。"
+    },
+    {
+      "code": "E_DS_PLUS_INB",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@inb",
+      "message": "@inb 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 `in al, dx`（需 @unsafe），或 extern C 封装。",
+      "base_alternative": "用 Ds 的 asm 写 `in al, dx`（需 @unsafe），或 extern C 封装。"
+    },
+    {
+      "code": "E_DS_PLUS_OUTB",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@outb",
+      "message": "@outb 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 `out dx, al`（需 @unsafe），或 extern C 封装。",
+      "base_alternative": "用 Ds 的 asm 写 `out dx, al`（需 @unsafe），或 extern C 封装。"
+    },
+    {
+      "code": "E_DS_PLUS_INW",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@inw",
+      "message": "@inw 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 16 位 in（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 16 位 in（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_OUTW",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@outw",
+      "message": "@outw 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 16 位 out（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 16 位 out（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_INL",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@inl",
+      "message": "@inl 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 32 位 in（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 32 位 in（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_OUTL",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@outl",
+      "message": "@outl 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 32 位 out（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 32 位 out（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_RDMSR",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@rdmsr",
+      "message": "@rdmsr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 rdmsr（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 rdmsr（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_WRMSR",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@wrmsr",
+      "message": "@wrmsr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 wrmsr（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 wrmsr（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_MMIO",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@mmio",
+      "message": "@mmio 是 Ds+ 关键字（MMIO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 `volatile ptr[T]`（配合 @at/裸地址）表达。",
+      "base_alternative": "用 Ds 的 `volatile ptr[T]`（配合 @at/裸地址）表达。"
+    },
+    {
+      "code": "E_DS_PLUS_RDCR",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@rdcr",
+      "message": "@rdcr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 mov crN（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 mov crN（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_WRCR",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@wrcr",
+      "message": "@wrcr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 mov crN（需 @unsafe）。",
+      "base_alternative": "用 Ds 的 asm 写 mov crN（需 @unsafe）。"
+    },
+    {
+      "code": "E_DS_PLUS_STACK",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@stack",
+      "message": "@stack 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：去掉 @stack 即可：Ds 局部变量默认在栈上。",
+      "base_alternative": "去掉 @stack 即可：Ds 局部变量默认在栈上。"
+    },
+    {
+      "code": "E_DS_PLUS_STATIC",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@static",
+      "message": "@static 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用模块级 var/let + @section(\".data\") 或 @at(addr) 近似，或用 Ds+。",
+      "base_alternative": "用模块级 var/let + @section(\".data\") 或 @at(addr) 近似，或用 Ds+。"
+    },
+    {
+      "code": "E_DS_PLUS_RAW",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@raw",
+      "message": "@raw 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 raw 指针 + alloc/free 手动管理（无区域保证）。",
+      "base_alternative": "用 Ds 的 raw 指针 + alloc/free 手动管理（无区域保证）。"
+    },
+    {
+      "code": "E_DS_PLUS_MMAP",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "stub",
+      "token": "@mmap",
+      "message": "@mmap 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：调用 extern C 的 mmap/map_page（需目标 OS 或用户代码）。",
+      "base_alternative": "调用 extern C 的 mmap/map_page（需目标 OS 或用户代码）。"
+    },
+    {
+      "code": "E_DS_PLUS_PROFILE",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "profile"
+    },
+    {
+      "code": "E_DS_PLUS_TARGET",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "target"
+    },
+    {
+      "code": "E_DS_PLUS_UNSAFE",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "unsafe"
+    },
+    {
+      "code": "E_DS_PLUS_CONST",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "const"
+    },
+    {
+      "code": "E_DS_PLUS_ALIGN",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "align"
+    },
+    {
+      "code": "E_DS_PLUS_VERSION_MISMATCH",
+      "branch": "plus",
+      "severity": "error",
+      "kind": "version"
+    }
+  ]
+}

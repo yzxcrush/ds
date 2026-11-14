@@ -1,0 +1,9 @@
+{
+  "base_branch": "main",
+  "plus_branch": "ds-plus",
+  "version": "0.1.0",
+  "rule": "Ds v0.x.x 与 Ds+ v0.x.x 必须同步发版；任一分支版本变化时，另一分支同步 bump。",
+  "surfaces": ["classic", "concise", "flow"],
+  "ast": "shared",
+  "surface_rule": "三档写法共享同一 AST；Ds+ 只扩展 IR/后端，不新增表面语法。"
+}

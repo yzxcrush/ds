@@ -1,0 +1,119 @@
+{
+  "version": "0.1.0",
+  "base_nodes": [
+    "Module",
+    "Package",
+    "Use",
+    "Mod",
+    "TypeDecl",
+    "ClassDecl",
+    "TraitDecl",
+    "ImplDecl",
+    "FnDecl",
+    "Param",
+    "Block",
+    "Let",
+    "Assign",
+    "ExprStmt",
+    "If",
+    "While",
+    "Loop",
+    "For",
+    "Break",
+    "Continue",
+    "Return",
+    "Goto",
+    "Label",
+    "Match",
+    "TryCatch",
+    "Panic",
+    "Recover",
+    "Assert",
+    "Spawn",
+    "Go",
+    "Thread",
+    "Chan",
+    "Send",
+    "Recv",
+    "Mutex",
+    "Wait",
+    "Alloc",
+    "Free",
+    "Ref",
+    "Ptr",
+    "Deref",
+    "Call",
+    "Field",
+    "Index",
+    "Binary",
+    "Unary",
+    "Literal",
+    "Var",
+    "Map",
+    "Array",
+    "FString"
+  ],
+  "plus_nodes": [
+    {
+      "name": "InlineAsm",
+      "fields": [
+        "template",
+        "inputs",
+        "outputs",
+        "clobbers",
+        "volatile"
+      ],
+      "lowers_to": "target asm / LLVM inline asm"
+    },
+    {
+      "name": "Intrinsic",
+      "fields": [
+        "name",
+        "width",
+        "args"
+      ],
+      "lowers_to": "target intrinsic / instruction"
+    },
+    {
+      "name": "RegionAlloc",
+      "fields": [
+        "region",
+        "allocator",
+        "size",
+        "align"
+      ],
+      "lowers_to": "stack/static/raw/mmap placement"
+    },
+    {
+      "name": "GlobalStatic",
+      "fields": [
+        "name",
+        "init",
+        "section"
+      ],
+      "lowers_to": ".data/.bss"
+    },
+    {
+      "name": "RawAlloc",
+      "fields": [
+        "size",
+        "allocator"
+      ],
+      "lowers_to": "user ds_raw_alloc/ds_raw_free"
+    },
+    {
+      "name": "MapPage",
+      "fields": [
+        "addr",
+        "len",
+        "hook"
+      ],
+      "lowers_to": "OS/user map_page"
+    }
+  ],
+  "invariants": [
+    "base IR 节点语义在 compat 与 bare 下保持一致；bare 仅限制可用子集",
+    "plus 节点只能由 plus 前端产生；compat 下若使用硬件节点必须显式 bare profile",
+    "三档写法必须产生相同的 base IR；plus 只影响 plus 节点"
+  ]
+}

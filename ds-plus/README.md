@@ -1,6 +1,6 @@
 # Ds+ 分支（重型版）
 
-> 状态：**Step 2 — Ds+ 新增关键字清单**（注册表 + base stub 守卫 + 测试已完成；编译器实现待 Step 3/4）
+> 状态：**Step 4 — 严格超集校验（结构契约）已完成**；P1–P3（语法/语义/ABI 超集）待 Ds+ 前端与后端实现
 > 版本绑定：Ds v0.x.x ↔ Ds+ v0.x.x
 > 关系：Ds+ 是 Ds 的**严格超集**，不是独立语言；Ds 代码粘贴到 Ds+ 必须 100% 编译通过。
 
@@ -22,8 +22,11 @@
 
 - `docs/STEP1-DIFF-MATRIX.md` — PYX→Ds+ 差异矩阵、机器翻译修正、裁决项
 - `docs/STEP2-KEYWORDS.md` — 12 个硬件关键字 + 4 个区域标注（语义/PYX 对应/编译行为/base stub）
-- 代码：`../ds-core/plus.keywords.json`、`tools/keyword_guard.py`、`tests/test_step2_keywords.py`
-- 后续：Step 3 ds-core 拆分、Step 4 超集校验
+- `docs/STEP3-DS-CORE.md` — ds-core 共享模块归属与变更规则
+- `docs/STEP4-SUPERSET.md` — S1–S13 超集校验规则、CI 门禁、P0–P3 证明阶段
+- 代码：`../ds-core/`（keywords/ABI/IR/diagnostics/version）、`tools/keyword_guard.py`、`tools/superset_check.py`
+- 测试：`tests/test_step2_keywords.py`（10）、`test_step3_core.py`（7）、`test_step4_superset.py`（2）
+- CI：`.github/workflows/ds-plus-check.yml`（base 单测 + C 对拍 + 契约 + 超集校验 + AI 包）
 
 ## 与 base 分支的关系
 

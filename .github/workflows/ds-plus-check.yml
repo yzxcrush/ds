@@ -1,0 +1,32 @@
+name: ds-plus-check
+
+on:
+  push:
+    branches: [ds-plus]
+  pull_request:
+    branches: [ds-plus]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: base 单元测试
+        run: python3 -m unittest discover -s tests
+      - name: ds-plus 契约测试
+        run: python3 -m unittest discover -s ds-plus/tests -v
+      - name: 注册表一致性
+        run: python3 ds-core/tools/build_registry.py --check
+      - name: 严格超集校验
+        run: python3 ds-plus/tools/superset_check.py --compile
+      - name: AI 学习包一致性
+        run: |
+          python3 tools/make_datasets.py --check
+          python3 tools/build_ai_kit.py --check
+      - name: C 驱动对拍
+        run: |
+          make -C c
+          sh c/run_tests.sh

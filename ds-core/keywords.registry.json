@@ -1,0 +1,634 @@
+{
+  "version": "0.1.0",
+  "base_count": 77,
+  "plus_count": 16,
+  "total": 93,
+  "entries": [
+    {
+      "token": "->",
+      "branch": "base",
+      "kind": "symbol",
+      "category": "管道"
+    },
+    {
+      "token": "=>",
+      "branch": "base",
+      "kind": "symbol",
+      "category": "管道"
+    },
+    {
+      "token": "@",
+      "branch": "base",
+      "kind": "symbol",
+      "category": "裸机"
+    },
+    {
+      "token": "alignof",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模式"
+    },
+    {
+      "token": "alloc",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "arc",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "as",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "asm",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "裸机"
+    },
+    {
+      "token": "assert",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "错误"
+    },
+    {
+      "token": "at",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "裸机"
+    },
+    {
+      "token": "attr",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "元编程"
+    },
+    {
+      "token": "break",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "catch",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "错误"
+    },
+    {
+      "token": "chan",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "class",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "comptime",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "元编程"
+    },
+    {
+      "token": "continue",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "drop",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "OOP"
+    },
+    {
+      "token": "dyn",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "OOP"
+    },
+    {
+      "token": "else",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "export",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "extends",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "OOP"
+    },
+    {
+      "token": "extern",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "fn",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "for",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "free",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "gc",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "go",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "goto",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "if",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "impl",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "in",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模式"
+    },
+    {
+      "token": "irq",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "裸机"
+    },
+    {
+      "token": "is",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模式"
+    },
+    {
+      "token": "let",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "loop",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "macro",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "元编程"
+    },
+    {
+      "token": "match",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模式"
+    },
+    {
+      "token": "mod",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "mut",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "mutex",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "new",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "OOP"
+    },
+    {
+      "token": "opt",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "错误"
+    },
+    {
+      "token": "package",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "packed",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "裸机"
+    },
+    {
+      "token": "panic",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "错误"
+    },
+    {
+      "token": "priv",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "prot",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "ptr",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "pub",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "raw",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "rc",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "recover",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "错误"
+    },
+    {
+      "token": "recv",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "ref",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "内存"
+    },
+    {
+      "token": "res",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "错误"
+    },
+    {
+      "token": "return",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "section",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "裸机"
+    },
+    {
+      "token": "self",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "OOP"
+    },
+    {
+      "token": "send",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "sizeof",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模式"
+    },
+    {
+      "token": "spawn",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "static",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "super",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "OOP"
+    },
+    {
+      "token": "thread",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "trait",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "try",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "错误"
+    },
+    {
+      "token": "type",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "typeinfo",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "元编程"
+    },
+    {
+      "token": "use",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模块"
+    },
+    {
+      "token": "var",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "定义"
+    },
+    {
+      "token": "volatile",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "裸机"
+    },
+    {
+      "token": "wait",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "并发"
+    },
+    {
+      "token": "when",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模式"
+    },
+    {
+      "token": "where",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "模式"
+    },
+    {
+      "token": "while",
+      "branch": "base",
+      "kind": "identifier",
+      "category": "控制"
+    },
+    {
+      "token": "|>",
+      "branch": "base",
+      "kind": "symbol",
+      "category": "管道"
+    },
+    {
+      "token": "@asm",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "汇编",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@inb",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "端口 IO",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@outb",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "端口 IO",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@inw",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "端口 IO",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@outw",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "端口 IO",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@inl",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "端口 IO",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@outl",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "端口 IO",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@rdmsr",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "系统寄存器",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@wrmsr",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "系统寄存器",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@mmio",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "MMIO",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@rdcr",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "系统寄存器",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@wrcr",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "系统寄存器",
+      "profiles": [
+        "bare"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@stack",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "内存区域",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "requires_unsafe": false
+    },
+    {
+      "token": "@static",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "内存区域",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "requires_unsafe": false
+    },
+    {
+      "token": "@raw",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "内存区域",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "requires_unsafe": true
+    },
+    {
+      "token": "@mmap",
+      "branch": "plus",
+      "kind": "at-token",
+      "category": "内存区域",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "requires_unsafe": true
+    }
+  ]
+}

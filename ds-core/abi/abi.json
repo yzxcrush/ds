@@ -1,0 +1,19 @@
+{
+  "default_layout": "repr(Ds)",
+  "c_layout": "repr(C)",
+  "c_abi_selector": ["@repr(C)", "@abi(\"C\")"],
+  "extern": "extern \"C\"",
+  "abi_rule": "base 与 plus 的默认布局都是 repr(Ds)；C ABI 必须显式开启（决策 ③A）。",
+  "bare_extern_abi": "C",
+  "build_targets": [
+    {"triple": "x86_64-linux-gnu", "branch": ["base", "plus"], "abi": "sysv", "runtime": ["app"]},
+    {"triple": "aarch64-linux-gnu", "branch": ["base", "plus"], "abi": "aapcs64", "runtime": ["app"]},
+    {"triple": "aarch64-linux-android", "branch": ["base", "plus"], "abi": "aapcs64", "runtime": ["app"]},
+    {"triple": "thumbv7em-none-eabi", "branch": ["base", "plus"], "abi": "eabi", "runtime": ["bare"]},
+    {"triple": "riscv32-none-elf", "branch": ["base", "plus"], "abi": "ilp32", "runtime": ["bare"]},
+    {"triple": "wasm32-unknown-unknown", "branch": ["base"], "abi": "wasm", "runtime": ["wasm"]},
+    {"triple": "x86_64-none", "branch": ["base", "plus"], "abi": "sysv", "runtime": ["bare"]}
+  ],
+  "plus_outputs": ["raw-binary", "elf32", "elf64", "bare-image"],
+  "not_in_0_1": ["i686/16-bit x86", "PE", "Mach-O", "WASM in bare profile"]
+}
