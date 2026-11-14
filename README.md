@@ -7,6 +7,22 @@
 
 > **定义 + 可执行参考驱动**：本仓库给出 Ds v0.1 的完整定位、词法、**77 项全量关键词表**、运算符、字面量、注释、EBNF、语义契约与 `dscc` 编译驱动定义，并附带 **Python 参考驱动**（词法器 → 解析器 → 树遍历解释器）与 `ds` / `dscc` 终端命令。**不产出机器码**，语言规范本身仍是定义稿。
 
+## 包管理 dspm（原型）
+
+包 = GitHub 仓库，版本 = git tag，源码即分发，无中心服务器：
+
+```bash
+./dspm install yzxcrush/ds-json@v0.3.0
+./dspm list
+./dspm remove yzxcrush/ds-json
+./dspm cache-clean
+```
+
+- `ds.toml` 声明包名/版本/exports/依赖/目标；lock 记录 tag+commit+tarball hash
+- 深度优先装依赖、缓存优先可离线、不执行任何包内脚本、unsafe 包需确认
+- 规范、安全说明、编译器 `use` 解析伪代码、Android 集成方案：[docs/DSPM.md](docs/DSPM.md)
+- 示例包：[examples/packages/ds-hello](examples/packages/ds-hello)
+
 ## 为什么是 Ds？
 
 一套语言覆盖 **应用 / 系统 / 裸机**，三档写法把 AI 生成成本压到最低，且每一步都能被三套参考实现执行验证：

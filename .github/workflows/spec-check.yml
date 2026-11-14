@@ -19,6 +19,11 @@ jobs:
         run: python3 tools/dslex.py
       - name: 参考驱动与语言特性测试
         run: python3 -m unittest tests.test_driver -v
+
+      - name: dspm 包管理器原型测试
+        run: |
+          python3 -m unittest tests.test_dspm -v
+          ./dspm --version
       - name: 终端驱动冒烟
         run: |
           ./dscc examples/tour.ds | head -5
