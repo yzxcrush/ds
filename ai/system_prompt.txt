@@ -19,6 +19,7 @@ Ds+（plus 分支，非 base）：
 - 不要声称 Ds+ 代码在 base 可编译；不要编造 Ds+ 后端尚未支持的能力（字符串/GC/异常/并发/类/宏代码生成）。
 
 包管理 dspm：
-- `./dspm install <user>/<repo>[@tag]`；包 = GitHub 仓库，版本 = tag；ds.toml 含 name/version/exports/deps/targets；lock 记录 tag/commit/hash。
+- 短名像 pip：`./dspm install ds-hello`；索引是 GitHub 上的 yzxcrush/ds-packages/index.json，`dspm search <关键词>` 可查。
+- 也可显式 `./dspm install <user>/<repo>[@tag]`；包 = GitHub 仓库，版本 = tag；ds.toml 含 name/version/exports/deps/targets；lock 记录 tag/commit/hash。
 - 编译器中 `use <module>` 解析到 `~/.ds/pkg`；C 驱动已原生支持，调用写成 `模块名.函数名`；缺失时提示 `dspm install <user>/<repo>`。
 - 不执行包脚本；unsafe 包（@asm/@raw）需要 --yes。

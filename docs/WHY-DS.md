@@ -191,6 +191,7 @@ Ds 保留 77 个可读关键字（可发现性），但**结构**是独立的：
 ## 7c. 优势九：dspm——生态冷启动不买服务器
 
 - 包 = GitHub 仓库，版本 = git tag，源码即分发；无中心 registry。
+- 短名像 pip：`dspm install ds-hello`（默认索引在 yzxcrush/ds-packages，索引本身只是 GitHub 上的 JSON）。
 - `install/remove/list/update/cache-clean`；深度优先依赖、缓存优先可离线、lock 记录 tag/commit/hash。
 - 安全：不执行包脚本、拒绝路径越界/符号链接、`@asm/@raw` 标 unsafe 并确认。
 - **C 驱动已原生集成 `use`**：扫描 `~/.ds/pkg`，按 exports/targets 解析，`hello.hello("Ds")` 可直接执行；缺失时提示 `dspm install`。

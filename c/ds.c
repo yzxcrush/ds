@@ -1453,6 +1453,11 @@ static Node *parse_program(int repl_mode) {
             if (cur()->kind == TK_IDENT) { adv(); }
             continue;
         }
+        /* 可见性修饰符：C 驱动不区分可见性，跳过 pub/priv/prot */
+        while (is_kw("pub") || is_kw("priv") || is_kw("prot")) {
+            adv();
+            skip_nl();
+        }
         Node *item = NULL;
         if (g_flow && cur()->kind == TK_OP && strcmp(cur()->s, "\\") == 0) item = parse_fn_flow();
         else if (is_kw("use")) item = parse_use();

@@ -15,6 +15,7 @@ import shutil
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
@@ -31,6 +32,10 @@ LOCK = HOME / "dspm.lock"
 BASE = os.environ.get("DSPM_GITHUB_BASE", "https://github.com").rstrip("/")
 API = os.environ.get("DSPM_GITHUB_API", "https://api.github.com").rstrip("/")
 TOKEN = os.environ.get("DSPM_TOKEN") or os.environ.get("GITHUB_TOKEN")
+INDEX_URL = os.environ.get(
+    "DSPM_INDEX_URL",
+    "https://raw.githubusercontent.com/yzxcrush/ds-packages/main/index.json")
+INDEX_CACHE = CACHE / "index.json"
 UA = "dspm/0.1 (+https://github.com/yzxcrush/ds)"
 REF_RE = re.compile(r"^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:@([A-Za-z0-9_.-]+))?$")
 AT_RE = re.compile(r"@(asm|raw|inb|outb|inw|outw|inl|outl|rdmsr|wrmsr|rdcr|wrcr|mmap|mmio)\b")
@@ -119,19 +124,88 @@ def download(owner: str, repo: str, tag: str, offline: bool) -> tuple[Path, bool
         return cached, True
     if offline:
         die(f"{owner}/{repo}@{tag} 不在缓存中（离线模式）")
-    url = f"{BASE}/{owner}/{repo}/archive/refs/tags/{tag}.tar.gz"
     cached.parent.mkdir(parents=True, exist_ok=True)
     tmp = cached.with_suffix(".part")
-    try:
-        log(f"↓ {url}")
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}),
-                                    timeout=120) as r, open(tmp, "wb") as f:
-            shutil.copyfileobj(r, f)
-    except Exception as exc:
-        tmp.unlink(missing_ok=True)
-        die(f"下载失败：{exc}")
-    tmp.replace(cached)
-    return cached, False
+    urls = [f"{BASE}/{owner}/{repo}/archive/refs/tags/{tag}.tar.gz"]
+    if "github.com" in BASE:
+        urls += [
+            f"https://codeload.github.com/{owner}/{repo}/tar.gz/refs/tags/{tag}",
+            f"{API}/repos/{owner}/{repo}/tarball/{tag}",
+        ]
+    last = None
+    for url in urls:
+        for attempt in range(2):
+            try:
+                log(f"↓ {url}")
+                headers = {"User-Agent": UA}
+                if TOKEN and "api.github.com" in url:
+                    headers["Authorization"] = f"Bearer {TOKEN}"
+                with urllib.request.urlopen(urllib.request.Request(url, headers=headers),
+                                            timeout=120) as r, open(tmp, "wb") as f:
+                    shutil.copyfileobj(r, f)
+                with tarfile.open(tmp, "r:gz"):
+                    pass  # 校验 tar
+                tmp.replace(cached)
+                return cached, False
+            except Exception as exc:
+                last = exc
+                tmp.unlink(missing_ok=True)
+                time.sleep(1)
+    die(f"下载失败（已尝试 {len(urls)} 个端点）：{last}")
+
+
+def fetch_index(offline: bool = False, refresh: bool = False) -> dict:
+    """获取包索引（短名 → GitHub repo）。默认缓存优先，可离线。"""
+    if INDEX_CACHE.exists() and not refresh:
+        try:
+            return json.loads(INDEX_CACHE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    if offline:
+        die("离线模式需要本地索引缓存；先联网运行一次 `dspm index`")
+    urls = [INDEX_URL]
+    if INDEX_URL.startswith("https://raw.githubusercontent.com/") and "DSPM_INDEX_URL" not in os.environ:
+        urls.append("https://cdn.jsdelivr.net/gh/yzxcrush/ds-packages@main/index.json")
+    last = None
+    for url in urls:
+        for _ in range(2):
+            try:
+                data = json.loads(_get(url))
+                INDEX_CACHE.parent.mkdir(parents=True, exist_ok=True)
+                INDEX_CACHE.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                                       encoding="utf-8")
+                return data
+            except Exception as exc:
+                last = exc
+    if INDEX_CACHE.exists():
+        return json.loads(INDEX_CACHE.read_text(encoding="utf-8"))
+    die(f"获取包索引失败：{last}（{INDEX_URL}）")
+    INDEX_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    INDEX_CACHE.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return data
+
+
+def _split_name_tag(ref: str) -> tuple[str, str | None]:
+    if "@" in ref:
+        name, tag = ref.split("@", 1)
+        return name, tag or None
+    return ref, None
+
+
+def resolve_target(ref: str, offline: bool = False) -> tuple[str, str, str]:
+    """解析安装目标：支持 `owner/repo[@tag]` 或索引短名 `pkg[@tag]`。"""
+    if "/" in ref:
+        return parse_ref(ref)
+    name, tag = _split_name_tag(ref)
+    idx = fetch_index(offline)
+    entry = (idx.get("packages") or {}).get(name)
+    if not entry:
+        die(f"索引里没有包 `{name}`；用 `dspm search <关键词>` 查看，或直接安装 `owner/repo@tag`")
+    repo = entry.get("repo", "")
+    if "/" not in repo:
+        die(f"索引项 `{name}` 的 repo 非法：{repo!r}")
+    owner, repo_name = repo.split("/", 1)
+    return owner, repo_name, tag or entry.get("latest") or "latest"
 
 
 def _safe_extract(tar: tarfile.TarFile, dest: Path) -> int:
@@ -202,7 +276,7 @@ def confirm(meta: dict, owner: str, repo: str, tag: str, files: list[Path],
 
 
 def install_ref(ref: str, opts, lock: dict, seen: set[str]) -> None:
-    owner, repo, tag = parse_ref(ref)
+    owner, repo, tag = resolve_target(ref, getattr(opts, "offline", False))
     key = f"{owner}/{repo}"
     if key in seen:
         log(f"↺ 跳过已处理的依赖 {key}")
@@ -256,17 +330,26 @@ def cmd_install(args) -> int:
 
 
 def cmd_remove(args) -> int:
-    owner, repo, tag = parse_ref(args.ref)
     lock = load_lock()
+    if "/" in args.ref:
+        owner, repo, _ = parse_ref(args.ref)
+        targets = [f"{owner}/{repo}"]
+    else:
+        name, _ = _split_name_tag(args.ref)
+        targets = [k for k, e in lock["packages"].items()
+                   if k.endswith("/" + name) or e.get("name") == name]
+        if not targets:
+            owner, repo, _ = resolve_target(args.ref)
+            targets = [f"{owner}/{repo}"]
     removed = []
     for key in list(lock["packages"]):
-        if key == f"{owner}/{repo}":
+        if key in targets:
             rel = lock["packages"][key]["path"]
             shutil.rmtree(HOME / rel, ignore_errors=True)
             del lock["packages"][key]
             removed.append(key)
     if not removed:
-        die(f"未安装 {owner}/{repo}")
+        die(f"未安装 {args.ref}")
     save_lock(lock)
     log(f"✓ 已移除 {', '.join(removed)}")
     return 0
@@ -299,6 +382,40 @@ def cmd_update(args) -> int:
         if old and old != new:
             shutil.rmtree(HOME / old, ignore_errors=True)
     save_lock(lock)
+    return 0
+
+
+def cmd_search(args) -> int:
+    idx = fetch_index(args.offline, refresh=args.refresh)
+    q = args.query.lower()
+    rows = []
+    for name, e in sorted((idx.get("packages") or {}).items()):
+        hay = f"{name} {e.get('summary', '')} {e.get('repo', '')}".lower()
+        if not q or q in hay:
+            rows.append((name, e.get("repo", ""), e.get("latest", ""), e.get("summary", "")))
+    if args.json:
+        print(json.dumps({"query": args.query, "packages": [
+            {"name": n, "repo": r, "latest": t, "summary": s} for n, r, t, s in rows]},
+            ensure_ascii=False, indent=2))
+    else:
+        for n, r, t, s in rows:
+            print(f"{n:<24} {t:<10} {r:<32} {s}")
+        if not rows:
+            print("（无匹配包）")
+    return 0
+
+
+def cmd_index(args) -> int:
+    idx = fetch_index(args.offline, refresh=args.refresh)
+    pkgs = idx.get("packages") or {}
+    if args.json:
+        print(json.dumps(idx, ensure_ascii=False, indent=2))
+    else:
+        print(f"索引：{INDEX_URL}")
+        print(f"缓存：{INDEX_CACHE}")
+        print(f"包数：{len(pkgs)}")
+        for n, e in sorted(pkgs.items()):
+            print(f"  {n:<24} {e.get('latest', ''):<10} {e.get('repo', '')}")
     return 0
 
 
@@ -357,6 +474,16 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("cache-clean", aliases=["缓存清理", "clean"])
     p.set_defaults(fn=cmd_cache_clean)
+
+    p = sub.add_parser("search", aliases=["搜索", "find"], help="搜索包索引")
+    p.add_argument("query", nargs="?", default=""); p.add_argument("--json", action="store_true")
+    p.add_argument("--offline", action="store_true"); p.add_argument("--refresh", action="store_true")
+    p.set_defaults(fn=cmd_search)
+
+    p = sub.add_parser("index", aliases=["索引"], help="查看/刷新包索引")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--offline", action="store_true"); p.add_argument("--refresh", action="store_true")
+    p.set_defaults(fn=cmd_index)
 
     p = sub.add_parser("resolve", help="编译器用：解析模块路径")
     p.add_argument("module"); p.add_argument("--target", default="ds")

@@ -44,7 +44,7 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 `@rdcr/@wrcr` 的 cr ∈ {0,2,3,4}；`@static` 初始化器必须常量；`@mmap` 字面量地址须页对齐。
 `compat` profile 保留全部 base 语义（严格超集），`bare` 无 GC/无语言运行时。
 
-**dspm（包管理）**：包 = GitHub 仓库，版本 = git tag；`./dspm install <user>/<repo>[@tag]`；
+**dspm（包管理）**：包 = GitHub 仓库，版本 = git tag；短名 `./dspm install ds-hello`（索引在 `yzxcrush/ds-packages`），也可 `./dspm install <user>/<repo>[@tag]`；
 `~/.ds/pkg/<user>/<repo>@<tag>/`、`~/.ds/dspm.lock`、`~/.ds/cache`；不执行包脚本，unsafe 包需确认。
 编译器 `use <module>` 解析到已安装包；C 驱动已原生支持，调用写成 `模块名.函数名`。
 

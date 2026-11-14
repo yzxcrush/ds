@@ -16,7 +16,7 @@ deps = []
 targets = ["app", "bare"]
 TOMLEOF
 cat > "$SRC/src/hello.ds" <<'DSEOF'
-fn hello(name: str) -> str { "hello, " + name }
+pub fn hello(name: str) -> str { "hello, " + name }
 DSEOF
 tar -czf "$GH/demo/ds-hello/archive/refs/tags/v0.1.0.tar.gz" -C "$TMP/src" ds-hello-v0.1.0
 DSPM_HOME="$TMP/home" DSPM_GITHUB_BASE="file://$GH" DSPM_GITHUB_API="http://127.0.0.1:9" \

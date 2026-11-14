@@ -60,6 +60,13 @@ class TestDspm(unittest.TestCase):
                               text=True, cwd=ROOT, env=self.env, stdin=stdin,
                               timeout=60)
 
+    def write_index(self, packages: dict):
+        idx = self.tmp / "index.json"
+        idx.write_text(json.dumps({"schema": 1, "packages": packages}, ensure_ascii=False),
+                       encoding="utf-8")
+        self.env["DSPM_INDEX_URL"] = f"file://{idx}"
+        return idx
+
     def pkg(self, owner, repo, tag, exports=("a",), deps=None, targets=("app",),
             extra=None, unsafe=False):
         files = {"ds.toml": meta(repo, tag.lstrip("v"), exports=list(exports),
@@ -152,6 +159,50 @@ class TestDspm(unittest.TestCase):
         self.assertIn("没有已安装", self.run_dspm("list").stdout)
         self.assertEqual(self.run_dspm("cache-clean").returncode, 0)
         self.assertFalse((self.home / "cache").exists())
+
+    def test_short_name_install(self):
+        self.pkg("fake", "hello", "v1", exports=("hello",), targets=("app",))
+        self.write_index({"ds-hello": {"repo": "fake/hello", "latest": "v1",
+                                       "summary": "demo"}})
+        r = self.run_dspm("install", "ds-hello")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((self.home / "pkg" / "fake" / "hello@v1" / "src" / "hello.ds").exists())
+        lock = json.loads((self.home / "dspm.lock").read_text(encoding="utf-8"))
+        self.assertIn("fake/hello", lock["packages"])
+
+    def test_short_name_with_tag_and_search(self):
+        self.pkg("fake", "hello", "v1", exports=("hello",))
+        self.write_index({"ds-hello": {"repo": "fake/hello", "latest": "v1",
+                                       "summary": "hello demo"},
+                          "ds-math": {"repo": "fake/math", "latest": "v2",
+                                      "summary": "math helpers"}})
+        r = self.run_dspm("search", "hello", "--json")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        names = [p["name"] for p in json.loads(r.stdout)["packages"]]
+        self.assertEqual(names, ["ds-hello"])
+        r = self.run_dspm("install", "ds-hello@v1")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        r = self.run_dspm("index")
+        self.assertIn("ds-hello", r.stdout)
+        r = self.run_dspm("remove", "ds-hello")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_short_name_missing(self):
+        self.write_index({})
+        r = self.run_dspm("install", "nope")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("索引里没有", r.stderr)
+
+    def test_offline_short_name(self):
+        self.pkg("fake", "hello", "v1", exports=("hello",))
+        self.write_index({"ds-hello": {"repo": "fake/hello", "latest": "v1"}})
+        self.assertEqual(self.run_dspm("install", "ds-hello").returncode, 0)
+        shutil.rmtree(self.home / "pkg" / "fake" / "hello@v1")
+        self.env["DSPM_INDEX_URL"] = "file:///nonexistent/index.json"
+        self.env["DSPM_GITHUB_BASE"] = "file:///nonexistent"
+        r = self.run_dspm("install", "ds-hello", "--offline")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.home / "pkg" / "fake" / "hello@v1" / "ds.toml").exists())
 
     def test_example_package(self):
         import tomllib

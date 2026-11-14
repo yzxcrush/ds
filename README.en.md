@@ -53,7 +53,7 @@ python3 -m unittest discover -s tests     # 158 tests
 ./dscc examples/concise/fib.ds            # concise
 ./dscc examples/flow/fib.dsf              # Flow
 sh c/run_tests.sh                         # Python ↔ C differential tests
-./dspm install <user>/<repo>@v0.1.0       # package manager (GitHub as registry)
+./dspm install ds-hello       # package manager (GitHub as registry)
 sh c/test_dspm_use.sh                     # C driver use/dspm end-to-end
 # Ds+: git clone -b ds-plus … · docs/DS-PLUS.md
 ```

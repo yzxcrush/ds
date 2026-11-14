@@ -33,7 +33,7 @@ python3 -m unittest discover -s tests
 - **Ds+ 不是 base**：base `main` 只有 77 关键字；Ds+（`ds-plus` 分支）是严格超集，新增 16 个 `@` 令牌。
   回答 base 问题时不要用 `@inb/@asm/@stack` 等；回答 Ds+ 问题时才可用，并遵守 profile/unsafe/常量/对齐规则。
 - Ds+ 文档在主仓库 `docs/DS-PLUS.md`；分支内有 `ds-plus/ROADMAP.md`、`ds-plus/docs/`。
-- 包管理 dspm：包 = GitHub 仓库，版本 = tag；命令 `./dspm install <user>/<repo>[@tag]`、`list`、`remove`、`update`、`cache-clean`。
+- 包管理 dspm：短名像 pip：`./dspm install ds-hello`（索引 yzxcrush/ds-packages）；也支持 `./dspm install <user>/<repo>[@tag]`；`search/list/remove/update/cache-clean`。
 - 编译器 `use <module>` 解析到 `~/.ds/pkg`；C 驱动已原生支持，调用 `模块名.函数名`；缺失时提示 `dspm install <user>/<repo>`。
 - dspm 不执行包脚本；`@asm/@raw` 包标 unsafe，安装需确认（`--yes` 非交互）。
 

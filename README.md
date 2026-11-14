@@ -12,7 +12,7 @@
 包 = GitHub 仓库，版本 = git tag，源码即分发，无中心服务器：
 
 ```bash
-./dspm install yzxcrush/ds-json@v0.3.0
+./dspm install ds-hello
 ./dspm list
 ./dspm remove yzxcrush/ds-json
 ./dspm cache-clean
@@ -23,7 +23,8 @@
 - **C 驱动已原生支持 `use`**：读取 `~/.ds/pkg` 安装布局，按 exports/targets 解析模块，缺失时提示 dspm install
 - 规范、安全说明、其它后端 `use` 解析伪代码、Android 集成方案：[docs/DSPM.md](docs/DSPM.md)
 - Ds+ 一页纸：[docs/DS-PLUS.md](docs/DS-PLUS.md) · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
-- 示例包：[examples/packages/ds-hello](examples/packages/ds-hello)
+- 示例包：[ds-hello（GitHub，可直接安装）](https://github.com/yzxcrush/ds-hello) · [examples/packages/ds-hello](examples/packages/ds-hello)
+- 包索引：[yzxcrush/ds-packages](https://github.com/yzxcrush/ds-packages)
 
 ## 为什么是 Ds？
 

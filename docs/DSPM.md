@@ -6,7 +6,9 @@
 ## 快速开始
 
 ```bash
-./dspm install yzxcrush/ds-json@v0.3.0        # 安装
+./dspm install ds-hello                        # 短名（像 pip install 一样，走包索引）
+./dspm search hello                            # 搜索包索引
+./dspm install yzxcrush/ds-json@v0.3.0        # 显式 owner/repo
 ./dspm install yzxcrush/ds-utf8@latest        # 最新 tag
 ./dspm list                                   # 已安装
 ./dspm update                                 # 检查/更新全部
@@ -16,6 +18,43 @@
 ```
 
 中文别名同样可用：`安装 / 移除 / 列表 / 更新 / 缓存清理`。
+
+短名解析：`dspm install ds-hello` 会读取 [yzxcrush/ds-packages](https://github.com/yzxcrush/ds-packages)
+的 `index.json`，把短名映射到 GitHub 仓库，再按 tag 下载 tarball。索引只是 GitHub 上的一个 JSON 文件，没有中心服务器。
+
+## 包索引（短名）
+
+- 默认索引：`https://raw.githubusercontent.com/yzxcrush/ds-packages/main/index.json`
+- 缓存：`~/.ds/cache/index.json`；`DSPM_INDEX_URL` 可覆盖（镜像/内网/本地索引）
+- 拉取失败会尝试 jsDelivr 镜像；再失败用缓存（可离线）
+- `index.json` 结构：
+
+```json
+{
+  "schema": 1,
+  "packages": {
+    "ds-hello": {
+      "repo": "yzxcrush/ds-hello",
+      "summary": "dspm 示例包：一个 hello 模块",
+      "latest": "v0.1.0",
+      "tags": ["v0.1.0"],
+      "targets": ["app", "bare"],
+      "exports": ["hello"]
+    }
+  }
+}
+```
+
+dspm 只依赖 `repo` 与 `latest`/`tags`；其余字段用于搜索展示与索引校验。
+
+## 发布自己的包（像发 Python 包一样）
+
+1. 建 GitHub 仓库，根目录 `ds.toml` + `src/<export>.ds`；
+2. 打 tag（如 `v0.1.0`）；
+3. Fork [ds-packages](https://github.com/yzxcrush/ds-packages)，在 `index.json` 加条目并提 PR；
+4. 合并后任何人可 `dspm install <你的短名>`。
+
+示例库：<https://github.com/yzxcrush/ds-hello>（`dspm install ds-hello` 可直接安装）。
 
 ## 目录布局
 
@@ -32,7 +71,10 @@
 
 | 命令 | 行为 |
 |---|---|
-| `install <user>/<repo>[@tag]` | 下载 `https://github.com/<user>/<repo>/archive/refs/tags/<tag>.tar.gz`，解压、校验 ds.toml、递归装依赖、写 lock；已安装同 tag 直接用本地 |
+| `install <name>[@tag]` | 短名 → 索引 → GitHub repo；等价 pip install 的体验 |
+| `install <user>/<repo>[@tag]` | 显式仓库；下载 `https://github.com/<user>/<repo>/archive/refs/tags/<tag>.tar.gz`（失败时自动回退 codeload / API tarball），解压、校验 ds.toml、递归装依赖、写 lock；已安装同 tag 直接用本地 |
+| `search [关键词]` | 搜索包索引（名称/摘要/仓库） |
+| `index [--refresh]` | 查看/刷新包索引缓存 |
 | `install ...@latest` | 通过 GitHub API 查最新 tag（本地镜像按 tag 排序） |
 | `remove <user>/<repo>` | 删除安装目录并移除 lock 条目 |
 | `list` | 打印 包 / tag / commit / unsafe / path |
@@ -173,7 +215,15 @@ App 是离线 WebView（`assets/ds.js`）且不内置 Python，推荐**原生 Ko
 
 ## 示例包：ds-hello
 
-见 `examples/packages/ds-hello/`（可直接作为 GitHub 仓库模板）。
+- 仓库：<https://github.com/yzxcrush/ds-hello>（tag `v0.1.0`）
+- 本地模板：`examples/packages/ds-hello/`
+- 安装：`dspm install ds-hello`
+- 使用：
+
+```ds
+use hello
+p(hello.hello("Ds"))
+```
 
 ## 限制（v0.1）
 

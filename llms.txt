@@ -19,6 +19,8 @@
 ## 包管理（dspm）
 
 - [dspm 规范与安全说明](docs/DSPM.md)
+- [包索引 yzxcrush/ds-packages](https://github.com/yzxcrush/ds-packages)（短名 → GitHub repo）
+- [示例库 ds-hello](https://github.com/yzxcrush/ds-hello)（`dspm install ds-hello`）
 - [dspm 原型 tools/dspm.py](tools/dspm.py)
 - [示例包 examples/packages/ds-hello](examples/packages/ds-hello)
 - C 驱动原生 `use` 解析：`sh c/test_dspm_use.sh`
