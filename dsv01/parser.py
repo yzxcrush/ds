@@ -1244,7 +1244,12 @@ class Parser:
             self.skip_seps()
             if self.at_kw("else"):
                 self.advance()
-                else_ = self.parse_flow_body()
+                look = self.tok if self.tok.kind != NEWLINE else self.peek_sig(1)
+                if look.kind == OP and look.text == "?":
+                    self.skip_nl()
+                    else_ = self.parse_flow_if()   # else-if，无需额外块终止符
+                else:
+                    else_ = self.parse_flow_body()
         node = ast.IfExpr(cond=cond, then_block=then_block, else_=else_, line=t.line, col=t.col)
         if as_stmt:
             return ast.ExprStmt(expr=node, line=t.line, col=t.col)

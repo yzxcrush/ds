@@ -12,3 +12,17 @@ p f"total={total}"
     p "multi-line body"
 .
 greet "Ds"
+
+\grade n
+    ?n==0
+        ^"z"
+    else
+        ?n>0
+            ^"p"
+        else
+            ^"n"
+        .
+.
+p grade(0)
+p grade(5)
+p grade(-1)

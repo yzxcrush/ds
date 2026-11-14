@@ -1113,7 +1113,14 @@ static Node *parse_flow_if(void) {
         skip_nl();
         if (is_kw("else")) {
             adv();
-            node->c = parse_flow_body();
+            int save = P_POS;
+            skip_nl();
+            if (cur()->kind == TK_OP && strcmp(cur()->s, "?") == 0) {
+                node->c = parse_flow_if();   /* else-if：无需额外块终止符 */
+            } else {
+                P_POS = save;
+                node->c = parse_flow_body();
+            }
         }
     }
     return node;
