@@ -1,6 +1,6 @@
 # Ds+ 分支（重型版）
 
-> 状态：**Step 1 — PYX→Ds+ 差异矩阵**（设计文档；尚未进入实现）
+> 状态：**Step 2 — Ds+ 新增关键字清单**（注册表 + base stub 守卫 + 测试已完成；编译器实现待 Step 3/4）
 > 版本绑定：Ds v0.x.x ↔ Ds+ v0.x.x
 > 关系：Ds+ 是 Ds 的**严格超集**，不是独立语言；Ds 代码粘贴到 Ds+ 必须 100% 编译通过。
 
@@ -20,8 +20,10 @@
 
 ## 目录
 
-- `docs/STEP1-DIFF-MATRIX.md` — 第一步交付：PYX→Ds+ 差异矩阵、机器翻译修正、待裁决项
-- 后续：Step 2 新增关键字清单、Step 3 ds-core 拆分、Step 4 超集校验
+- `docs/STEP1-DIFF-MATRIX.md` — PYX→Ds+ 差异矩阵、机器翻译修正、裁决项
+- `docs/STEP2-KEYWORDS.md` — 12 个硬件关键字 + 4 个区域标注（语义/PYX 对应/编译行为/base stub）
+- 代码：`../ds-core/plus.keywords.json`、`tools/keyword_guard.py`、`tests/test_step2_keywords.py`
+- 后续：Step 3 ds-core 拆分、Step 4 超集校验
 
 ## 与 base 分支的关系
 

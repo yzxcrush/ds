@@ -1,0 +1,20 @@
+# Ds+ 硬件/区域关键字示例（Dt base 不能编译，应触发 stub 错误）
+@stack var s: i32 = 42
+@static var g: u64 = 0x1000
+@raw var dma: ptr[u8] = alloc(4096)
+@mmap var page: ptr[u8] = map_page(0xC0000000, 4096)
+
+fn kernel() {
+    var key = @inb(0x60)
+    @outb(0x20, 0x20)
+    var w = @inw(0x3F8)
+    @outw(0x3F8, w)
+    var l = @inl(0xCFC)
+    @outl(0xCFC, l)
+    @asm volatile("cli")
+    let efer = @rdmsr(0xC0000080)
+    @wrmsr(0xC0000080, efer | 0x100)
+    let cr3 = @rdcr(3)
+    @wrcr(3, cr3)
+    let uart = @mmio(0x3F8, u8)
+}

@@ -1,0 +1,402 @@
+{
+  "language": "Ds+",
+  "branch": "ds-plus",
+  "version": "0.1.0",
+  "base_branch": "main",
+  "base_keywords": 77,
+  "counts": {
+    "hardware_keywords": 12,
+    "region_annotations": 4,
+    "new_at_tokens": 16,
+    "note": "12 个硬件关键字满足『约 10–12』；4 个区域标注是决策 8 的独立令牌，不占用硬件名额。"
+  },
+  "policy": {
+    "superset": "Ds+ 是 Ds 的严格超集：base 77 关键字与语义保持不变；Ds 代码必须 100% 编译通过。",
+    "keyword_freeze": "base 77 冻结；Ds+ 只在 @ 命名空间新增令牌。",
+    "at_disambiguation": "上下文关键字：@ 后名字属于本表且后续语法符合硬件/区域用法才识别为 Ds+ 令牌，否则按 Ds 属性解析（决策 ②A）。",
+    "profiles": {
+      "bare": "Ds+ 裸机 profile：--bare --gc none --rt none；无 GC、无语言运行时；输出 raw binary / ELF / bare image。",
+      "compat": "Ds 兼容 profile：完整保留 base 语义（含 app 运行时、GC、异常、反射、OOP），用于严格超集校验。"
+    },
+    "abi": "保留 Ds 默认 repr(Ds)；C ABI 通过 @repr(C)/@abi(\"C\") 显式开启（决策 ③A）。",
+    "atomics": "无锁原语（@atomic/@fence/@cas）不在本轮 12 个硬件关键字内，计划 0.2 同步版本引入（决策 ④A）。",
+    "outputs": "Ds+ 继承全部 base 输出，并新增 --raw（裸机镜像/纯二进制）；i686/PE/Mach-O/WASM 后续（决策 ⑤A）。",
+    "not_adopted": [
+      "struct",
+      "union",
+      "enum",
+      "alias",
+      "function",
+      "zero",
+      "@trusted"
+    ]
+  },
+  "keywords": [
+    {
+      "name": "@asm",
+      "kind": "hardware",
+      "category": "汇编",
+      "pyx": "asm / ASM Volatile（一等公民）",
+      "syntax": "@asm [volatile] (\"模板\" [, \"r\"(expr)...] [: \"=r\"(out)...] [: \"memory\", ...])",
+      "semantics": "内联汇编语句/表达式：把模板与操作数下发给目标后端；volatile 禁止重排与删除；操作数约束沿用 C/LLVM 约定。",
+      "lowering": "IR::InlineAsm { template, inputs, outputs, clobbers, volatile } -> 目标汇编/LLVM inline asm",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64",
+        "aarch64",
+        "riscv32",
+        "thumbv7em"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_ASM",
+        "message": "@asm 是 Ds+ 关键字（汇编），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 语句（需放在 @unsafe 块内）；Ds+ 的 @asm 额外支持操作数/约束/clobber/volatile。",
+        "base_alternative": "用 Ds 的 asm 语句（需放在 @unsafe 块内）；Ds+ 的 @asm 额外支持操作数/约束/clobber/volatile。"
+      }
+    },
+    {
+      "name": "@inb",
+      "kind": "hardware",
+      "category": "端口 IO",
+      "pyx": "inb（8 位端口读）",
+      "syntax": "@inb(port: u16) -> u8",
+      "semantics": "从 x86 I/O 端口读 1 字节；等价 in al, dx。",
+      "lowering": "IR::Intrinsic{ name: \"port_in\", width: 8, port } -> x86 `in` 指令",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_INB",
+        "message": "@inb 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 `in al, dx`（需 @unsafe），或 extern C 封装。",
+        "base_alternative": "用 Ds 的 asm 写 `in al, dx`（需 @unsafe），或 extern C 封装。"
+      }
+    },
+    {
+      "name": "@outb",
+      "kind": "hardware",
+      "category": "端口 IO",
+      "pyx": "outb（8 位端口写）",
+      "syntax": "@outb(port: u16, value: u8) -> unit",
+      "semantics": "向 x86 I/O 端口写 1 字节；等价 out dx, al。",
+      "lowering": "IR::Intrinsic{ name: \"port_out\", width: 8, port, value }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_OUTB",
+        "message": "@outb 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 `out dx, al`（需 @unsafe），或 extern C 封装。",
+        "base_alternative": "用 Ds 的 asm 写 `out dx, al`（需 @unsafe），或 extern C 封装。"
+      }
+    },
+    {
+      "name": "@inw",
+      "kind": "hardware",
+      "category": "端口 IO",
+      "pyx": "inw（16 位端口读）",
+      "syntax": "@inw(port: u16) -> u16",
+      "semantics": "从 x86 I/O 端口读 2 字节；等价 in ax, dx。",
+      "lowering": "IR::Intrinsic{ name: \"port_in\", width: 16, port }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_INW",
+        "message": "@inw 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 16 位 in（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 16 位 in（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@outw",
+      "kind": "hardware",
+      "category": "端口 IO",
+      "pyx": "outw（16 位端口写）",
+      "syntax": "@outw(port: u16, value: u16) -> unit",
+      "semantics": "向 x86 I/O 端口写 2 字节；等价 out dx, ax。",
+      "lowering": "IR::Intrinsic{ name: \"port_out\", width: 16, port, value }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_OUTW",
+        "message": "@outw 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 16 位 out（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 16 位 out（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@inl",
+      "kind": "hardware",
+      "category": "端口 IO",
+      "pyx": "inl（32 位端口读）",
+      "syntax": "@inl(port: u16) -> u32",
+      "semantics": "从 x86 I/O 端口读 4 字节；等价 in eax, dx。",
+      "lowering": "IR::Intrinsic{ name: \"port_in\", width: 32, port }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_INL",
+        "message": "@inl 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 32 位 in（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 32 位 in（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@outl",
+      "kind": "hardware",
+      "category": "端口 IO",
+      "pyx": "outl（32 位端口写）",
+      "syntax": "@outl(port: u16, value: u32) -> unit",
+      "semantics": "向 x86 I/O 端口写 4 字节；等价 out dx, eax。",
+      "lowering": "IR::Intrinsic{ name: \"port_out\", width: 32, port, value }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_OUTL",
+        "message": "@outl 是 Ds+ 关键字（端口 IO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 32 位 out（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 32 位 out（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@rdmsr",
+      "kind": "hardware",
+      "category": "系统寄存器",
+      "pyx": "rdmsr",
+      "syntax": "@rdmsr(msr: u32) -> u64",
+      "semantics": "读模型特定寄存器（MSR），返回 64 位值；等价 rdmsr，特权级。",
+      "lowering": "IR::Intrinsic{ name: \"msr_read\", msr }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_RDMSR",
+        "message": "@rdmsr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 rdmsr（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 rdmsr（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@wrmsr",
+      "kind": "hardware",
+      "category": "系统寄存器",
+      "pyx": "wrmsr",
+      "syntax": "@wrmsr(msr: u32, value: u64) -> unit",
+      "semantics": "写模型特定寄存器（MSR）；等价 wrmsr，特权级。",
+      "lowering": "IR::Intrinsic{ name: \"msr_write\", msr, value }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_WRMSR",
+        "message": "@wrmsr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 wrmsr（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 wrmsr（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@mmio",
+      "kind": "hardware",
+      "category": "MMIO",
+      "pyx": "@mmio（内存映射 IO）",
+      "syntax": "@mmio(addr: usize, T: type) -> volatile ptr[T]",
+      "semantics": "返回带 volatile 语义的 MMIO 指针；每次读写都不得被优化掉/合并；可用于任意目标。",
+      "lowering": "IR::Intrinsic{ name: \"mmio\", addr, T } -> 生成 volatile load/store",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64",
+        "aarch64",
+        "riscv32",
+        "thumbv7em"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_MMIO",
+        "message": "@mmio 是 Ds+ 关键字（MMIO），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 `volatile ptr[T]`（配合 @at/裸地址）表达。",
+        "base_alternative": "用 Ds 的 `volatile ptr[T]`（配合 @at/裸地址）表达。"
+      }
+    },
+    {
+      "name": "@rdcr",
+      "kind": "hardware",
+      "category": "系统寄存器",
+      "pyx": "CR0/CR2/CR3/CR4 读取",
+      "syntax": "@rdcr(cr: comptime u8) -> usize  # cr ∈ {0,2,3,4}",
+      "semantics": "读控制寄存器；cr 必须是编译期常量；特权级。",
+      "lowering": "IR::Intrinsic{ name: \"cr_read\", cr }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_RDCR",
+        "message": "@rdcr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 mov crN（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 mov crN（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@wrcr",
+      "kind": "hardware",
+      "category": "系统寄存器",
+      "pyx": "CR0/CR2/CR3/CR4 写入",
+      "syntax": "@wrcr(cr: comptime u8, value: usize) -> unit  # cr ∈ {0,2,3,4}",
+      "semantics": "写控制寄存器；cr 必须是编译期常量；特权级。",
+      "lowering": "IR::Intrinsic{ name: \"cr_write\", cr, value }",
+      "profiles": [
+        "bare"
+      ],
+      "targets": [
+        "x86_64"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_WRCR",
+        "message": "@wrcr 是 Ds+ 关键字（系统寄存器），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 asm 写 mov crN（需 @unsafe）。",
+        "base_alternative": "用 Ds 的 asm 写 mov crN（需 @unsafe）。"
+      }
+    },
+    {
+      "name": "@stack",
+      "kind": "region",
+      "category": "内存区域",
+      "pyx": "@stack",
+      "syntax": "@stack let/var 名: T = 表达式",
+      "semantics": "显式栈放置：变量分配在当前栈帧，零运行时开销；默认局部变量已如此，显式标注用于可读性与自文档。",
+      "lowering": "IR::Alloc { region: Stack }",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "targets": [
+        "x86_64",
+        "aarch64",
+        "aarch64-android",
+        "riscv32",
+        "thumbv7em",
+        "wasm32"
+      ],
+      "requires_unsafe": false,
+      "base_stub": {
+        "code": "E_DS_PLUS_STACK",
+        "message": "@stack 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：去掉 @stack 即可：Ds 局部变量默认在栈上。",
+        "base_alternative": "去掉 @stack 即可：Ds 局部变量默认在栈上。"
+      }
+    },
+    {
+      "name": "@static",
+      "kind": "region",
+      "category": "内存区域",
+      "pyx": "@static",
+      "syntax": "@static var 名: T = 编译期常量",
+      "semantics": "静态区放置：分配在 .data/.bss，地址固定；初始化器必须是编译期常量；生命周期=程序。",
+      "lowering": "IR::Global { region: Static, init }",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "targets": [
+        "x86_64",
+        "aarch64",
+        "aarch64-android",
+        "riscv32",
+        "thumbv7em",
+        "wasm32"
+      ],
+      "requires_unsafe": false,
+      "base_stub": {
+        "code": "E_DS_PLUS_STATIC",
+        "message": "@static 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用模块级 var/let + @section(\".data\") 或 @at(addr) 近似，或用 Ds+。",
+        "base_alternative": "用模块级 var/let + @section(\".data\") 或 @at(addr) 近似，或用 Ds+。"
+      }
+    },
+    {
+      "name": "@raw",
+      "kind": "region",
+      "category": "内存区域",
+      "pyx": "@raw",
+      "syntax": "@raw var 名: ptr[T] = alloc(n)  # 手动 free",
+      "semantics": "裸内存区域：手动管理，无 GC、无隐藏分配；分配/释放走 Ds 的 alloc/free；bare profile 不提供内置分配器，链接时提供 ds_raw_alloc/ds_raw_free。",
+      "lowering": "IR::Alloc { region: Raw, allocator: \"user\" }",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "targets": [
+        "x86_64",
+        "aarch64",
+        "aarch64-android",
+        "riscv32",
+        "thumbv7em",
+        "wasm32"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_RAW",
+        "message": "@raw 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：用 Ds 的 raw 指针 + alloc/free 手动管理（无区域保证）。",
+        "base_alternative": "用 Ds 的 raw 指针 + alloc/free 手动管理（无区域保证）。"
+      }
+    },
+    {
+      "name": "@mmap",
+      "kind": "region",
+      "category": "内存区域",
+      "pyx": "@mmap",
+      "syntax": "@mmap var 名: ptr[T] = map_page(addr, len)",
+      "semantics": "页映射区域：页对齐、按页管理；映射函数由 OS 或用户代码提供（bare 下由内核实现）；未经映射访问是 UB。",
+      "lowering": "IR::Alloc { region: Map, hook: \"map_page\" }",
+      "profiles": [
+        "bare",
+        "compat"
+      ],
+      "targets": [
+        "x86_64",
+        "aarch64",
+        "aarch64-android",
+        "riscv32",
+        "thumbv7em",
+        "wasm32"
+      ],
+      "requires_unsafe": true,
+      "base_stub": {
+        "code": "E_DS_PLUS_MMAP",
+        "message": "@mmap 是 Ds+ 关键字（内存区域），Ds 基础版不支持；请使用 Ds+ 编译器，或改用：调用 extern C 的 mmap/map_page（需目标 OS 或用户代码）。",
+        "base_alternative": "调用 extern C 的 mmap/map_page（需目标 OS 或用户代码）。"
+      }
+    }
+  ]
+}
