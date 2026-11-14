@@ -20,6 +20,8 @@
 | **S11** | AI 学习包 base 子集一致 | `make_datasets.py --check` + `build_ai_kit.py --check` | 阻断 |
 | **S12** | base 三档示例完整 | 文件存在性 | 阻断 |
 | **S13** | base 编译器可编译 base 三档示例 | `--compile` 冒烟 | 阻断 |
+| **S14** | P1 前端：base AST 等价 + 16 令牌注入 | `dsplus.frontend` | 阻断 |
+| **S15** | P1 前端：三档写法 plus AST 特征一致 | `dsplus.frontend` | 阻断 |
 
 ## 2. 运行
 
@@ -46,7 +48,7 @@ python3 -m unittest discover -s ds-plus/tests -v
 | 阶段 | 证明方式 | 当前状态 |
 |---|---|---|
 | P0 结构与关键字 | S1–S12 | ✅ 本步完成 |
-| P1 语法超集 | base 全部 `.ds/.dsf` 同时送 base 与 Ds+（compat）前端，比较 token→AST 摘要 | 待 Ds+ 前端 |
+| P1 语法超集 | base 全部 `.ds/.dsf` 同时送 base 与 Ds+（compat）前端，比较 token→AST 摘要 | ✅ **前端已实现**（S14/S15）；全量 corpus 比对待扩 |
 | P2 语义超集 | 同一输入两实现执行结果逐字节比对（复用 `c/run_tests.sh` 模式） | 待 Ds+ 运行时/后端 |
 | P3 ABI 超集 | base 程序在 Ds+ 下产物的 ABI 指纹与 base 一致 | 待机器码后端 |
 

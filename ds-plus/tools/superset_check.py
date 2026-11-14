@@ -7,12 +7,15 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import pathlib
 import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))   # 确保 import dsv01 来自仓库而非已安装包
 CORE = ROOT / "ds-core"
 
 
@@ -105,6 +108,49 @@ def checks(compile_base: bool = False):
               "examples/concise/fib.ds", "examples/flow/fib.dsf"]
     ok = all((ROOT / p).exists() for p in needed)
     add("S12", "base 三档示例完整", ok, f"{len(needed)} files")
+
+    # S14 P1 前端：base AST 等价 + 16 令牌注入
+    if str(ROOT / "ds-plus") not in sys.path:
+        sys.path.insert(0, str(ROOT / "ds-plus"))
+    from dsplus.frontend import collect_plus_features, parse_program  # type: ignore
+    from dsv01.parser import parse_program as base_parse  # type: ignore
+
+    def ser(x):
+        if isinstance(x, list):
+            return [ser(i) for i in x]
+        if dataclasses.is_dataclass(x):
+            return {f.name: ser(getattr(x, f.name)) for f in dataclasses.fields(x)}
+        return x
+
+    ok = True
+    detail = []
+    for rel in ("examples/concise/hello.ds", "examples/concise/fib.ds",
+                "examples/flow/fib.dsf", "examples/tour.ds"):
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        same = ser(parse_program(src, rel)) == ser(base_parse(src, rel))
+        ok = ok and same
+        detail.append(f"{rel}: {'same' if same else 'DIFF'}")
+    p1_src = (ROOT / "ds-plus" / "examples" / "p1_hardware.ds").read_text(encoding="utf-8")
+    feats = collect_plus_features(parse_program(p1_src, "p1_hardware.ds"))
+    regions = [f for f in feats if f[0] == "Region"]
+    intrinsics = [f for f in feats if f[0] == "Intrinsic"]
+    asm = [f for f in feats if f[0] == "InlineAsm"]
+    ok = ok and len(regions) == 4 and len(intrinsics) == 11 and len(asm) == 2
+    detail.append(f"p1: regions={len(regions)}, intrinsics={len(intrinsics)}, asm={len(asm)}")
+    add("S14", "P1 前端：base AST 等价 + 16 令牌注入", ok, "; ".join(detail))
+
+    # S15 P1 前端：三档写法 plus 特征一致
+    classic = "@stack var s: i32 = 42\nfn f() { @outb(0x20, 0x20)\n let k = @inb(0x60) }\n"
+    concise = "@stack s = 42\nfn f() { @outb(0x20, 0x20)\n let k = @inb(0x60) }\n"
+    flow = "#!flow\n@stack s = 42\n\\f\n    @outb(0x20, 0x20)\n    let k = @inb(0x60)\n.\n"
+    def feat(src, fn):
+        fs = collect_plus_features(parse_program(src, fn))
+        return {
+            "regions": sorted(f[1] for f in fs if f[0] == "Region"),
+            "intrinsics": [f for f in fs if f[0] == "Intrinsic"],
+        }
+    a, b, d = feat(classic, "a.ds"), feat(concise, "b.ds"), feat(flow, "c.dsf")
+    add("S15", "P1 三档写法共享 plus AST 特征", a == b == d, f"classic={a['regions']}, flow={d['regions']}")
 
     # S13（可选）base 编译器可编译 base 示例
     if compile_base:

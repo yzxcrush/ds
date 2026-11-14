@@ -22,7 +22,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 REGISTRY_PATH = ROOT / "ds-core" / "plus.keywords.json"
 TOKEN_RE = re.compile(r"@([A-Za-z_][A-Za-z0-9_]*)")
-REGION_NEXT = re.compile(r"\s*(let|var|fn|type|const|@)")
+REGION_NEXT = re.compile(r"\s*(let|var|@|[A-Za-z_]\w*\s*(?::[^=\n]+)?=)")
 
 
 def load_registry() -> dict:

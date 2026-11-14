@@ -47,7 +47,8 @@ Ds 的 `@` 是属性前缀；Ds+ 的 `@` 令牌必须**上下文识别**，否�
 1. 词法层：`@` + 标识符产生 `AT_NAME` 候选，不直接定为关键字。
 2. 语法层按上下文重分类：
    - 硬件：`AT_NAME` 后接 `(`、`{`，或 `volatile` 后接 `(` → Ds+ 硬件关键字；
-   - 区域：`AT_NAME` 后接 `let` / `var` / `fn` / `type` / `const` / 另一个 `@` → Ds+ 区域标注；
+   - 区域：`AT_NAME` 后接 `let` / `var` / 隐式赋值（`x = ...`）/ 另一个 `@` → Ds+ 区域标注；
+     **注意**：`@raw fn`、`@stack type` 等仍按 Ds 属性解析（base 合法），不能把属性误判成区域；
    - 其他情况（出现在 item 前、类型前、函数前的属性位置）→ 按 Ds 属性解析。
 3. 属性名空间中 `raw/asm/stack/...` 不设为保留；因此形如 `@raw fn f()` 的 Ds 属性代码仍按属性解析（可编译），满足 100% 超集。
 
@@ -70,7 +71,7 @@ Ds 的 `@` 是属性前缀；Ds+ 的 `@` 令牌必须**上下文识别**，否�
 ```ds
 @stack var s: i32 = 42
 @static var g: u64 = 0x1000
-@raw var dma: ptr[u8] = alloc(4096)
+@raw var dma: ptr[u8] = malloc(4096)
 @mmap var page: ptr[u8] = map_page(0xC0000000, 4096)
 
 fn kernel() {
