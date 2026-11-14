@@ -15,8 +15,10 @@
 | 维度 | Ds 的答案 |
 |---|---|
 | 一套语言三种交付 | `--app` 应用、`--bare` 裸机、交叉编译 7 个目标 |
-| 能力密度 | 77 个关键字覆盖类型/内存/错误/并发/元编程/OOP/模式/裸机 |
+| 能力密度 | 77 个关键字覆盖类型/内存/错误/并发/元编程/OOP/模式/裸机；Ds+ 再加 16 个硬件/区域令牌 |
 | Token 效率 | 常见程序：经典 137 → 精简 82（-31%）→ Flow 69（**-49%**）token |
+| 双分支 | Ds（77 冻结）/ Ds+（严格超集，裸机硬件与四区域内存） |
+| 包管理 | dspm：GitHub 即包仓库，无中心服务器；C 驱动原生 `use` 解析 |
 | 可预测 | 静态类型、显式内存五选一、确定性析构、错误分层、结构化并发、布局可控 |
 | 可验证 | 三套实现 + 逐用例对拍 + AI 评测集（25 任务，自动执行比对） |
 | 可学习 | `llms.txt` / 语言卡 / 130 KB 全量上下文 / 41 条 SFT / 评测脚本 |
@@ -179,6 +181,21 @@ Ds 保留 77 个可读关键字（可发现性），但**结构**是独立的：
 
 ---
 
+## 7b. 优势八：Ds+ 严格超集（裸机能力不污染 base）
+
+- base 77 关键字冻结；Ds+ 只新增 16 个 `@` 令牌（12 硬件 + 4 区域），**Ds 代码 100% 通过**。
+- 双 profile：`compat` 保留全部 base 语义；`bare` 无 GC/无语言运行时，输出 ELF/raw binary。
+- P0–P6 已实现：ds-core 共享、前端、语义检查、compat 模拟执行、IR/ABI、x86-64 子集后端、CLI、发布。
+- 验证：61 项 Ds+ 测试 + S1–S18 超集校验 + CI；base 分支完全不受影响。
+
+## 7c. 优势九：dspm——生态冷启动不买服务器
+
+- 包 = GitHub 仓库，版本 = git tag，源码即分发；无中心 registry。
+- `install/remove/list/update/cache-clean`；深度优先依赖、缓存优先可离线、lock 记录 tag/commit/hash。
+- 安全：不执行包脚本、拒绝路径越界/符号链接、`@asm/@raw` 标 unsafe 并确认。
+- **C 驱动已原生集成 `use`**：扫描 `~/.ds/pkg`，按 exports/targets 解析，`hello.hello("Ds")` 可直接执行；缺失时提示 `dspm install`。
+- 示例包 `examples/packages/ds-hello`；后续可移植 Kotlin（Android）。
+
 ## 8. 客观对比（不吹不黑）
 
 | 维度 | Python | Rust | Go | C/C++ | Ds（0.1） |
@@ -220,11 +237,13 @@ Ds 保留 77 个可读关键字（可发现性），但**结构**是独立的：
 |---|---|
 | 规范 `spec/` | 0.1 定义稿 + 0.1c/Flow 写法档 |
 | Python 参考驱动 `dsv01/` | 全量语义子集（含 class/match/opt/res/try/并发/内存/元编程） |
-| C 驱动 `c/` | 核心子集（经典/精简/Flow），与 Python 逐用例对拍 |
-| Android App | 内核 0.2.0（0.1c + Flow），GitHub Actions 出 APK |
-| AI 学习包 | llms.txt + 语言卡 + 数据 + 评测器，CI 校验 |
+| C 驱动 `c/` | 核心子集（经典/精简/Flow），与 Python 逐用例对拍；原生 `use` + dspm 包解析 |
+| 包管理 dspm | install/remove/list/update/cache-clean/resolve；10 项离线测试；示例包 ds-hello |
+| Ds+ `ds-plus` | 严格超集；16 个 `@` 令牌；P0–P6；61 项测试 + S1–S18；x86-64 子集后端 |
+| Android App | 内核 0.2.0（0.1c + Flow），GitHub Actions 出 APK；包管理为集成方案 |
+| AI 学习包 | llms.txt + 语言卡 + 数据 + 评测器 + Ds+/dspm 上下文，CI 校验 |
 
-路线图（0.2）：包管理器与标准库雏形 → C 驱动补全 class/match/opt/res → App 语法高亮/模板 → 后端 IR/代码生成探索。
+路线图（0.2）：Python/Android 接 `use` 与 lock → C 驱动补全 class/match/opt/res → Ds+ 非 x86 后端/优化 → App 包管理实装。
 
 ---
 
@@ -238,6 +257,9 @@ python3 -m unittest discover -s tests        # 158 项测试
 ./dscc examples/concise/fib.ds               # 0.1c
 ./dscc examples/flow/fib.dsf                 # Flow
 sh c/run_tests.sh                            # Python/C 对拍
+./dspm install <user>/<repo>@v0.1.0          # dspm 包管理（GitHub 包仓库）
+sh c/test_dspm_use.sh                        # C 驱动 use/dspm 端到端
+# Ds+：git clone -b ds-plus …；见 docs/DS-PLUS.md
 
 # Android 编译器
 https://github.com/yzxcrush/ds-compiler/releases/latest
@@ -250,6 +272,8 @@ https://github.com/yzxcrush/ds-compiler/releases/latest
 - 规范：<https://github.com/yzxcrush/ds/blob/main/spec/DS-v0.1.md>
 - AI 入口：<https://raw.githubusercontent.com/yzxcrush/ds/main/llms.txt>
 - 评测：<https://github.com/yzxcrush/ds/blob/main/datasets/ds_bench.jsonl>
+- 包管理：<https://github.com/yzxcrush/ds/blob/main/docs/DSPM.md>
+- Ds+：<https://github.com/yzxcrush/ds/blob/main/docs/DS-PLUS.md> · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
 
 ---
 

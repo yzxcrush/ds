@@ -9,15 +9,25 @@
 - [精简写法（0.1c，省 token 默认推荐）](spec/DS-CONCISE.md)
 - [Flow 写法（结构性最省 token）](spec/DS-FLOW.md)
 - [为什么是 Ds（优势/对比/适用范围）](docs/WHY-DS.md)
+- [Ds+（plus 分支）一页纸](docs/DS-PLUS.md) · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
+- [dspm 包管理规范](docs/DSPM.md)
 - [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
 - [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
 - [机器可读关键词表 spec/keywords.json](spec/keywords.json)
 - [给 AI Agent 的说明 ai/AGENTS.md](ai/AGENTS.md)
 
+## 包管理（dspm）
+
+- [dspm 规范与安全说明](docs/DSPM.md)
+- [dspm 原型 tools/dspm.py](tools/dspm.py)
+- [示例包 examples/packages/ds-hello](examples/packages/ds-hello)
+- C 驱动原生 `use` 解析：`sh c/test_dspm_use.sh`
+
 ## 可执行参考实现
 
 - [Python 参考驱动 dsv01/](dsv01/)
 - [终端命令 ds / dscc](ds)
+- [C 驱动 c/（含 use/dspm 集成）](c/)
 - [示例 examples/](examples/)
 
 ## 训练与评测数据

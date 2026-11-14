@@ -34,6 +34,8 @@ def build() -> str:
     concise = read("spec/DS-CONCISE.md")
     flow = read("spec/DS-FLOW.md")
     why = read("docs/WHY-DS.md")
+    plus = read("docs/DS-PLUS.md")
+    dspm = read("docs/DSPM.md")
     spec = read("spec/DS-v0.1.md")
     llms = read("llms.txt")
     keywords = read("spec/keywords.json")
@@ -66,6 +68,14 @@ def build() -> str:
         "## 2a. 为什么是 Ds（优势与边界）",
         "",
         why,
+        "",
+        "## 2d. Ds+（plus 分支）",
+        "",
+        plus,
+        "",
+        "## 2e. dspm 包管理",
+        "",
+        dspm,
         "",
         "## 2c. Language Card",
         "",

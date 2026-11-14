@@ -15,15 +15,25 @@
 - [精简写法（0.1c，省 token 默认推荐）](spec/DS-CONCISE.md)
 - [Flow 写法（结构性最省 token）](spec/DS-FLOW.md)
 - [为什么是 Ds（优势/对比/适用范围）](docs/WHY-DS.md)
+- [Ds+（plus 分支）一页纸](docs/DS-PLUS.md) · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
+- [dspm 包管理规范](docs/DSPM.md)
 - [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
 - [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
 - [机器可读关键词表 spec/keywords.json](spec/keywords.json)
 - [给 AI Agent 的说明 ai/AGENTS.md](ai/AGENTS.md)
 
+## 包管理（dspm）
+
+- [dspm 规范与安全说明](docs/DSPM.md)
+- [dspm 原型 tools/dspm.py](tools/dspm.py)
+- [示例包 examples/packages/ds-hello](examples/packages/ds-hello)
+- C 驱动原生 `use` 解析：`sh c/test_dspm_use.sh`
+
 ## 可执行参考实现
 
 - [Python 参考驱动 dsv01/](dsv01/)
 - [终端命令 ds / dscc](ds)
+- [C 驱动 c/（含 use/dspm 集成）](c/)
 - [示例 examples/](examples/)
 
 ## 训练与评测数据
@@ -45,19 +55,30 @@ python3 -m unittest discover -s tests
 ## 1. 系统提示词（可直接粘贴给模型）
 
 ```text
-你是 Ds v0.1 专家。优先使用 0.1c 精简写法以节省 token。Ds 是一门静态类型、显式内存、可裸机运行、编译期可元编程的系统级语言，
-共 77 个硬关键字（73 字母 + @ -> => |> 四个符号），全部不可作标识符。
+你是 Ds v0.1 / Ds+ 专家。优先使用 0.1c 精简写法以节省 token；极限省 token 用 Flow。
+Ds 是静态类型、显式内存、可裸机运行、编译期可元编程的系统级语言，base 共 77 个硬关键字（73 字母 + @ -> => |> 四个符号），全部不可作标识符。
+架构：base `main` 分支（77 冻结）与 Ds+ `ds-plus` 分支（严格超集，新增 16 个 @ 令牌）。回答 base 问题时不得使用 @ 硬件令牌；回答 Ds+ 问题时必须按 plus 规则。
+
 回答时必须遵守：
 - 优先精简写法：不需要 `package`/`fn main`（顶层语句即入口）；`fn f(a,b)=a+b`；`for i in 0..10: ...`；`x=1` 即不可变定义、可变用 `var`；`+=` 等复合赋值；`f"{x}"` 插值。
-- 泛型与数组用方括号 `[T]`；空映射写 `{:}`；映射写 `{k:v}`；类实例用 `类.new(...)` 构造，
-  值类型用 `名(字段: 值)` 构造；不存在结构体字面量。
+- 泛型与数组用方括号 `[T]`；空映射写 `{:}`；映射写 `{k:v}`；类实例用 `类.new(...)` 构造，值类型用 `名(字段: 值)` 构造；不存在结构体字面量。
 - 箭头分工：`->` 类型、`=>` 分支/单表达式函数体、`|>` 表达式管道。
 - 变量：`let` 不可变、`var` 可变；不存在 `let mut`。
 - 错误分层：可恢复用 `res[T,E]`/`opt[T]` + `try`/`catch`；不可恢复 `panic`；`assert` 查不变量。
-- 生成代码时使用 ```ds 代码块，并在末尾给出等价的 `dscc 文件.ds` 运行方式。
+- 生成代码时使用 ```ds 代码块，并在末尾给出等价运行方式（`./dscc 文件.ds` 或 `c/build/ds 文件.ds`）。
 - 不确定的语义先查语言卡（ai/LANGUAGE_CARD.md）与规范（spec/DS-v0.1.md），不要编造关键字。
 
-若用户要求「最少 token」或结构更独特，可使用 Flow 写法（.dsf）：\ 定义函数、并置调用、. 结束块、? 条件、^ 返回。
+Flow 写法（.dsf）：`\` 定义函数、并置调用、`.` 结束块、`?` 条件、`^` 返回；三档写法同一 AST。
+
+Ds+（plus 分支，非 base）：
+- 16 个 @ 令牌：@asm @inb @outb @inw @outw @inl @outl @rdmsr @wrmsr @rdcr @wrcr @mmio；@stack @static @raw @mmap。
+- 硬件仅 `--bare` profile，且需要 @unsafe；@rdcr/@wrcr 的 cr ∈ {0,2,3,4}；@static 初始化器必须常量；@mmap 字面量地址须页对齐；区域只标注 let/var/隐式赋值。
+- 不要声称 Ds+ 代码在 base 可编译；不要编造 Ds+ 后端尚未支持的能力（字符串/GC/异常/并发/类/宏代码生成）。
+
+包管理 dspm：
+- `./dspm install <user>/<repo>[@tag]`；包 = GitHub 仓库，版本 = tag；ds.toml 含 name/version/exports/deps/targets；lock 记录 tag/commit/hash。
+- 编译器中 `use <module>` 解析到 `~/.ds/pkg`；C 驱动已原生支持，调用写成 `模块名.函数名`；缺失时提示 `dspm install <user>/<repo>`。
+- 不执行包脚本；unsafe 包（@asm/@raw）需要 --yes。
 
 ```
 
@@ -440,8 +461,10 @@ show 0
 | 维度 | Ds 的答案 |
 |---|---|
 | 一套语言三种交付 | `--app` 应用、`--bare` 裸机、交叉编译 7 个目标 |
-| 能力密度 | 77 个关键字覆盖类型/内存/错误/并发/元编程/OOP/模式/裸机 |
+| 能力密度 | 77 个关键字覆盖类型/内存/错误/并发/元编程/OOP/模式/裸机；Ds+ 再加 16 个硬件/区域令牌 |
 | Token 效率 | 常见程序：经典 137 → 精简 82（-31%）→ Flow 69（**-49%**）token |
+| 双分支 | Ds（77 冻结）/ Ds+（严格超集，裸机硬件与四区域内存） |
+| 包管理 | dspm：GitHub 即包仓库，无中心服务器；C 驱动原生 `use` 解析 |
 | 可预测 | 静态类型、显式内存五选一、确定性析构、错误分层、结构化并发、布局可控 |
 | 可验证 | 三套实现 + 逐用例对拍 + AI 评测集（25 任务，自动执行比对） |
 | 可学习 | `llms.txt` / 语言卡 / 130 KB 全量上下文 / 41 条 SFT / 评测脚本 |
@@ -604,6 +627,21 @@ Ds 保留 77 个可读关键字（可发现性），但**结构**是独立的：
 
 ---
 
+## 7b. 优势八：Ds+ 严格超集（裸机能力不污染 base）
+
+- base 77 关键字冻结；Ds+ 只新增 16 个 `@` 令牌（12 硬件 + 4 区域），**Ds 代码 100% 通过**。
+- 双 profile：`compat` 保留全部 base 语义；`bare` 无 GC/无语言运行时，输出 ELF/raw binary。
+- P0–P6 已实现：ds-core 共享、前端、语义检查、compat 模拟执行、IR/ABI、x86-64 子集后端、CLI、发布。
+- 验证：61 项 Ds+ 测试 + S1–S18 超集校验 + CI；base 分支完全不受影响。
+
+## 7c. 优势九：dspm——生态冷启动不买服务器
+
+- 包 = GitHub 仓库，版本 = git tag，源码即分发；无中心 registry。
+- `install/remove/list/update/cache-clean`；深度优先依赖、缓存优先可离线、lock 记录 tag/commit/hash。
+- 安全：不执行包脚本、拒绝路径越界/符号链接、`@asm/@raw` 标 unsafe 并确认。
+- **C 驱动已原生集成 `use`**：扫描 `~/.ds/pkg`，按 exports/targets 解析，`hello.hello("Ds")` 可直接执行；缺失时提示 `dspm install`。
+- 示例包 `examples/packages/ds-hello`；后续可移植 Kotlin（Android）。
+
 ## 8. 客观对比（不吹不黑）
 
 | 维度 | Python | Rust | Go | C/C++ | Ds（0.1） |
@@ -645,11 +683,13 @@ Ds 保留 77 个可读关键字（可发现性），但**结构**是独立的：
 |---|---|
 | 规范 `spec/` | 0.1 定义稿 + 0.1c/Flow 写法档 |
 | Python 参考驱动 `dsv01/` | 全量语义子集（含 class/match/opt/res/try/并发/内存/元编程） |
-| C 驱动 `c/` | 核心子集（经典/精简/Flow），与 Python 逐用例对拍 |
-| Android App | 内核 0.2.0（0.1c + Flow），GitHub Actions 出 APK |
-| AI 学习包 | llms.txt + 语言卡 + 数据 + 评测器，CI 校验 |
+| C 驱动 `c/` | 核心子集（经典/精简/Flow），与 Python 逐用例对拍；原生 `use` + dspm 包解析 |
+| 包管理 dspm | install/remove/list/update/cache-clean/resolve；10 项离线测试；示例包 ds-hello |
+| Ds+ `ds-plus` | 严格超集；16 个 `@` 令牌；P0–P6；61 项测试 + S1–S18；x86-64 子集后端 |
+| Android App | 内核 0.2.0（0.1c + Flow），GitHub Actions 出 APK；包管理为集成方案 |
+| AI 学习包 | llms.txt + 语言卡 + 数据 + 评测器 + Ds+/dspm 上下文，CI 校验 |
 
-路线图（0.2）：包管理器与标准库雏形 → C 驱动补全 class/match/opt/res → App 语法高亮/模板 → 后端 IR/代码生成探索。
+路线图（0.2）：Python/Android 接 `use` 与 lock → C 驱动补全 class/match/opt/res → Ds+ 非 x86 后端/优化 → App 包管理实装。
 
 ---
 
@@ -663,6 +703,9 @@ python3 -m unittest discover -s tests        # 158 项测试
 ./dscc examples/concise/fib.ds               # 0.1c
 ./dscc examples/flow/fib.dsf                 # Flow
 sh c/run_tests.sh                            # Python/C 对拍
+./dspm install <user>/<repo>@v0.1.0          # dspm 包管理（GitHub 包仓库）
+sh c/test_dspm_use.sh                        # C 驱动 use/dspm 端到端
+# Ds+：git clone -b ds-plus …；见 docs/DS-PLUS.md
 
 # Android 编译器
 https://github.com/yzxcrush/ds-compiler/releases/latest
@@ -675,6 +718,8 @@ https://github.com/yzxcrush/ds-compiler/releases/latest
 - 规范：<https://github.com/yzxcrush/ds/blob/main/spec/DS-v0.1.md>
 - AI 入口：<https://raw.githubusercontent.com/yzxcrush/ds/main/llms.txt>
 - 评测：<https://github.com/yzxcrush/ds/blob/main/datasets/ds_bench.jsonl>
+- 包管理：<https://github.com/yzxcrush/ds/blob/main/docs/DSPM.md>
+- Ds+：<https://github.com/yzxcrush/ds/blob/main/docs/DS-PLUS.md> · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
 
 ---
 
@@ -691,6 +736,267 @@ AI learning kit (`llms.txt`, language card, SFT/corpus/bench datasets, auto-grad
 implementations (Python, C, Android) with differential tests. Status: definition-first (v0.1) — great as a
 design/teaching/prototyping language; **no ecosystem yet**, so not a production replacement for
 Python/Rust/Go/C++.
+
+
+## 2d. Ds+（plus 分支）
+
+# Ds+（plus 分支）一页纸
+
+> Ds+ 是 Ds 的**严格超集**：base 77 关键字与语义不变，新增 16 个 `@` 令牌。
+> 分支 `ds-plus`；发布 `ds-plus-v0.1.0`；基础版 `main` 不受影响。
+
+## 为什么有 Ds+
+
+同一门语言里既要「应用/系统」的通用能力，又要「裸机/内核」的硬件能力。拆成双分支：
+
+- **Ds（base）**：稳定、冻结 77 关键字，适合应用与教学。
+- **Ds+（plus）**：在 base 之上加硬件/内存区域，不破坏 base 代码。
+
+## 新增能力（16 个 @ 令牌）
+
+**硬件 12**：`@asm @inb @outb @inw @outw @inl @outl @rdmsr @wrmsr @rdcr @wrcr @mmio`
+**区域 4**：`@stack @static @raw @mmap`
+
+```ds
+@stack var s: i32 = 42
+@static var g: u64 = 0x1000
+
+@unsafe fn kernel() {
+    @outb(0x3F8, 65)
+    let key = @inb(0x60)
+    let efer = @rdmsr(0xC0000080)
+    @wrmsr(0xC0000080, efer | 0x100)
+    let cr3 = @rdcr(3)
+    @wrcr(3, cr3)
+    let uart = @mmio(0x3F8, u8)
+    @asm volatile("cli")
+}
+```
+
+规则：硬件仅 `bare` profile；`@asm`/端口 IO/MSR/CR/`@raw`/`@mmap` 需要 `@unsafe`；
+`@rdcr/@wrcr` 的 cr ∈ {0,2,3,4}；`@static` 初始化器必须常量；`@mmap` 字面量地址页对齐。
+
+## 已实现（P0–P6）
+
+| 阶段 | 内容 |
+|---|---|
+| P0 | ds-core：93 项注册表、ABI、IR、诊断码、版本冻结 |
+| P1 | 前端：16 令牌解析；base AST 与 Ds 逐字段一致；三档写法一致 |
+| P2 | 语义：profile/unsafe/常量/对齐；compat 模拟执行；`@asm` 输入操作数 |
+| P3 | IR 规范化哈希 + ABI 指纹 |
+| P4 | x86-64 子集后端：ELF / raw binary |
+| P5 | `dsplus` CLI、SFT、语言卡 |
+| P6 | v0.1.0 预览发布 |
+
+验证：61 项 Ds+ 测试、S1–S18 超集校验、CI 绿。
+
+## 工具
+
+```bash
+ds-plus/bin/dsplus check  file.ds --profile bare
+ds-plus/bin/dsplus run    file.ds --profile bare
+ds-plus/bin/dsplus build  file.ds --raw -o kernel.bin
+ds-plus/bin/dsplus ir     file.ds --hash
+```
+
+## 限制
+
+- P4 仅 x86-64 子集：无字符串/GC/异常/并发/类/宏后端、无优化/链接脚本、无 `@mmio` 代码生成。
+- P2 是规则级检查，非完整类型推断/借用检查。
+- 未合并进 `main`（双分支架构），base 保持纯 Ds。
+
+## 入口
+
+- 分支：<https://github.com/yzxcrush/ds/tree/ds-plus>
+- 路线：<https://github.com/yzxcrush/ds/blob/ds-plus/ds-plus/ROADMAP.md>
+- 发布：<https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0>
+
+
+## 2e. dspm 包管理
+
+# dspm — Ds 包管理器（v0.1 原型）
+
+> **包 = GitHub 仓库，版本 = git tag，源码即分发，无中心服务器。**
+> 客户端：`tools/dspm.py`（单文件，Python 3.11+）；命令包装：`./dspm`。
+
+## 快速开始
+
+```bash
+./dspm install yzxcrush/ds-json@v0.3.0        # 安装
+./dspm install yzxcrush/ds-utf8@latest        # 最新 tag
+./dspm list                                   # 已安装
+./dspm update                                 # 检查/更新全部
+./dspm remove yzxcrush/ds-json                # 卸载
+./dspm cache-clean                            # 清缓存
+./dspm resolve json --target ds               # 编译器用：解析模块路径
+```
+
+中文别名同样可用：`安装 / 移除 / 列表 / 更新 / 缓存清理`。
+
+## 目录布局
+
+```
+~/.ds/
+├── pkg/<user>/<repo>@<tag>/       # 安装后的源码（只解压，不执行）
+├── cache/<user>/<repo>@<tag>.tar.gz
+└── dspm.lock                      # JSON：tag + commit + tarball hash + 依赖
+```
+
+`DSPM_HOME` 可覆盖 `~/.ds`（测试/Android 私有目录用）。`DSPM_GITHUB_BASE`、`DSPM_GITHUB_API` 可覆盖端点（本地镜像/镜像站）。
+
+## 命令
+
+| 命令 | 行为 |
+|---|---|
+| `install <user>/<repo>[@tag]` | 下载 `https://github.com/<user>/<repo>/archive/refs/tags/<tag>.tar.gz`，解压、校验 ds.toml、递归装依赖、写 lock；已安装同 tag 直接用本地 |
+| `install ...@latest` | 通过 GitHub API 查最新 tag（本地镜像按 tag 排序） |
+| `remove <user>/<repo>` | 删除安装目录并移除 lock 条目 |
+| `list` | 打印 包 / tag / commit / unsafe / path |
+| `update [repo]` | 对已装包检查最新 tag，更新锁与目录（保留旧缓存） |
+| `cache-clean` | 删除 `~/.ds/cache` |
+| `resolve <module> [--target]` | 按 lock + exports 找模块源码路径，供编译器使用 |
+| `--offline` | install/update 只用缓存，不联网 |
+| `--yes` | 非交互确认（unsafe 包必需） |
+| `--target ds\|cut\|base\|app\|bare\|plus` | 目标兼容过滤（默认 ds） |
+
+### 目标兼容（三层架构）
+
+`targets` 声明包支持的环境：
+
+- 包 `targets = ["app"]` → Ds base 的 app 目标；
+- `targets = ["bare"]` → Ds base 的 bare 目标；
+- `targets = ["plus"]` → Ds+；
+- `--target ds`（`cut`/`base` 是别名）接受 `targets` 含 `ds`/`app`/`bare` 的包；
+- `--target plus` 要求 `targets` 含 `plus`。
+
+> 需求中的“Cut 只装 目标 含 cut 的包”按 **Ds base** 处理：`cut` 映射到 `ds`，并接受 app/bare 包。
+
+## ds.toml 规范
+
+```toml
+name = "ds-json"          # 必填：包名（唯一标识，建议 ds-<功能>）
+version = "0.3.0"         # 必填：语义化版本
+description = "JSON 解析/序列化"
+authors = ["@somebody"]   # 可选：作者/维护者
+license = "MIT"           # 可选
+exports = ["json"]        # 模块导出名：use JSON 时查找 src/json.ds
+deps = ["yzxcrush/ds-utf8@v0.2.1"]   # 依赖：<user>/<repo>[@tag]，默认 latest
+targets = ["app", "bare"] # 支持的目标：app/bare/plus
+```
+
+补充约定：
+
+- `exports` 省略时默认 `[name]`；`targets` 省略时默认 `["app"]`。
+- 源码放在 `src/<export>.ds`（也接受根目录 `<export>.ds` / `.dsf`）。
+- `ds.toml` **不包含任何 build/install 脚本**；dspm 从不执行包内命令。
+- 兼容别名：`deps`/`DEPS`/`依赖`，便于早期手写文件。
+- `unsafe` 不在 ds.toml 声明，由 dspm 扫描 `@asm/@raw` 等令牌自动判定。
+
+## dspm.lock
+
+JSON 格式（示例）：
+
+```json
+{
+  "version": 1,
+  "packages": {
+    "yzxcrush/ds-json": {
+      "tag": "v0.3.0",
+      "commit": "9f2c...",
+      "tarball_sha256": "…",
+      "path": "pkg/yzxcrush/ds-json@v0.3.0",
+      "targets": ["app", "bare"],
+      "unsafe": false,
+      "deps": ["yzxcrush/ds-utf8@v0.2.1"],
+      "name": "ds-json"
+    }
+  }
+}
+```
+
+- `commit` 来自 GitHub API `commits/<tag>`；离线/本地镜像时为 `""`，但 `tarball_sha256` 始终记录。
+- 依赖解析：深度优先、按 `<user>/<repo>` 去重（先到先得）；不做 SAT 求解。
+
+## 安全
+
+1. **不执行**包内任何 build/install 脚本（dspm 没有 postinstall 机制）。
+2. 解压时拒绝：绝对路径、`..` 越界、符号链接/硬链接。
+3. 安装前显示：包名/版本、作者、目标、依赖数、文件数。
+4. 扫描 `@asm/@raw` 等令牌 → `unsafe=true`；**需要 `--yes`**（或交互确认）才安装。
+5. 源码即分发：建议安装前 review 仓库；dspm 不做运行时沙箱。
+
+## 编译器 `use` 解析
+
+### C 驱动（已实现）
+
+`c/ds.c` 现在真正解析 `use`，不依赖 Python/dspm 可执行文件，也不联网：
+
+```text
+use hello
+p(hello.hello("Ds"))
+```
+
+行为：
+
+1. 解析 `use <module> [as 别名]`（`ND_USE` 节点）；
+2. 在 `DSPM_HOME`（默认 `~/.ds`）下扫描 `pkg/*/*/ds.toml`；
+3. 用极简 TOML 读取 `exports` / `targets`，匹配模块名（大小写不敏感）；
+4. 目标过滤：base C 驱动接受 `targets` 含 `ds`/`cut`/`base`/`app`/`bare`；仅 `plus` 的包跳过；
+5. 加载 `src/<export>.ds` / `src/<export>.dsf` / `<export>.ds`；
+6. 模块内 `use` 递归加载（去重防环）；模块函数注册为 `模块名.函数名`（别名可改命名空间）；
+7. 找不到时诊断：`找不到模块 \`x\`；请运行 dspm install <user>/<repo>（DSPM_HOME=...）`。
+
+注意：C 驱动当前只导出模块函数（模块顶层 let 会求值但不进入命名空间）；不做版本选择——用已安装目录（先到先得）。
+
+端到端测试：`sh c/test_dspm_use.sh`（file:// 本地镜像装包 → C 驱动解析执行 → 缺失模块诊断）。
+
+### 其他后端（参考伪代码）
+
+```text
+function resolve_use(module_name, target):
+    lock = read("~/.ds/dspm.lock")
+    for pkg in lock.packages:
+        meta = read_toml(pkg.path / "ds.toml")
+        if module_name not in meta.exports: continue
+        if not target_ok(meta, target): continue
+        for cand in [pkg.path/src/{module}.ds,
+                     pkg.path/{module}.ds,
+                     pkg.path/src/{module}.dsf]:
+            if exists(cand): return cand
+    error("找不到模块 {module_name}；请运行 `dspm install <user>/<repo>`")
+```
+
+Python/Android 后端接入时建议：
+
+1. 解析 `use JSON` → 模块名 `JSON`；
+2. 调 `dspm resolve JSON --target ds`（或直接读 lock，避免子进程）；
+3. 把返回文件加入编译单元 / 模块依赖图；
+4. 未找到时输出带安装提示的诊断（`DSPM2001`）；
+5. `--target` 与当前分支一致（Ds base = `ds`，Ds+ = `plus`）。
+
+## Android App 集成方案（简述）
+
+App 是离线 WebView（`assets/ds.js`）且不内置 Python，推荐**原生 Kotlin 重写 dspm 核心**：
+
+1. **存储**：`context.filesDir/ds/`（私有）：`pkg/`、`cache/`、`dspm.lock`；UI 增加「包管理」抽屉/标签页。
+2. **网络**：`HttpURLConnection`/OkHttp 下载 GitHub tarball；`java.util.zip.GZIPInputStream + TarArchiveInputStream`（commons-compress）解压；复用同一套路径校验（拒绝 `..`/链接）。
+3. **锁/清单**：JSON 用 org.json；ds.toml 用轻量 TOML 解析器（如 tomlj）或仅解析必需字段。
+4. **UI**：已装列表（tag/commit/unsafe）、安装输入框 `<user>/<repo>[@tag]`、卸载、缓存清理、离线开关；安装前显示元信息，unsafe 二次确认。
+5. **目标过滤**：App 内核是 Ds base → `--target ds`；未来 Ds+ 内核传 `plus`。
+6. **安全**：不执行包脚本；只解压源码；限制单包大小/文件数；网络需 `INTERNET` 权限。
+7. **可选**：支持 GitHub token（仅内存保存）提升 API 限额；不内置镜像。
+8. 测试：JVM 单测覆盖 ds.toml/lock/路径校验；UI 测试用 MockWebServer 模拟 GitHub。
+
+## 示例包：ds-hello
+
+见 `examples/packages/ds-hello/`（可直接作为 GitHub 仓库模板）。
+
+## 限制（v0.1）
+
+- 无版本范围/冲突求解；同包多版本只保留先装入的 tag。
+- 无签名/哈希校验（除 tarball sha256 记录）。
+- 不做依赖图循环检测（深度优先 + 去重足够）。
+- Python 原型；C/Java 移植后续。
 
 
 ## 2c. Language Card
@@ -729,6 +1035,23 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 ```
 
 经典/0.1c/Flow 三者可分别混用；Flow 相比 0.1c 再省约 15% token。详见 `spec/DS-FLOW.md`。
+
+## 0c. Ds+（plus 分支）与 dspm
+
+**Ds+ 是 Ds 的严格超集**（分支 `ds-plus`，base `main` 不受影响），新增 16 个 `@` 令牌：
+
+- 硬件 12：`@asm @inb @outb @inw @outw @inl @outl @rdmsr @wrmsr @rdcr @wrcr @mmio`
+- 区域 4：`@stack @static @raw @mmap`
+
+规则：硬件仅 `--bare`；`@asm`/端口 IO/MSR/CR/`@raw`/`@mmap` 需要 `@unsafe`；
+`@rdcr/@wrcr` 的 cr ∈ {0,2,3,4}；`@static` 初始化器必须常量；`@mmap` 字面量地址须页对齐。
+`compat` profile 保留全部 base 语义（严格超集），`bare` 无 GC/无语言运行时。
+
+**dspm（包管理）**：包 = GitHub 仓库，版本 = git tag；`./dspm install <user>/<repo>[@tag]`；
+`~/.ds/pkg/<user>/<repo>@<tag>/`、`~/.ds/dspm.lock`、`~/.ds/cache`；不执行包脚本，unsafe 包需确认。
+编译器 `use <module>` 解析到已安装包；C 驱动已原生支持，调用写成 `模块名.函数名`。
+
+详见 `docs/DS-PLUS.md`、`docs/DSPM.md`。
 
 ## 1. 定位
 
@@ -3541,9 +3864,10 @@ drop circle
 
 你是要使用 / 学习 / 生成 Ds v0.1 代码的 AI Agent。请按以下顺序获取上下文：
 
-0. **写代码优先用 0.1c 精简写法；要极限省 token 用 Flow（`.dsf`：\ 定义/并置调用/. 结束块）**（`spec/DS-CONCISE.md`）：无 package/fn main、`fn f(a,b)=a+b`、`for i in 0..n: ...`、`+=`、`f"{x}"`。
+0. **写代码优先用 0.1c 精简写法；要极限省 token 用 Flow（`.dsf`：\ 定义/并置调用/. 结束块）**（`spec/DS-CONCISE.md`）。
+   注意：base 只有 77 关键字；Ds+ 是 `ds-plus` 分支的严格超集，新增 16 个 `@` 令牌，默认不要混用。
 1. **先读** `ai/LANGUAGE_CARD.md`（约 5k token，含全部 77 关键字、语法、语义、示例）。
-2. 需要精确细节时读 `spec/DS-v0.1.md`（完整规范，含每个关键字的形式/语义/示例）。
+2. 需要精确细节时读 `spec/DS-v0.1.md`（完整规范）；Ds+ 读 `docs/DS-PLUS.md`；包管理读 `docs/DSPM.md`。
 3. 机器可读索引：`spec/keywords.json`（77 词 + 形式 + 语义 + 示例）。
 4. 需要作品参考：`examples/*.ds`（应用/并发/内存/裸机四个示例）。
 5. 生成代码后，**用参考驱动验证**（见下），不要凭空断言正确性。
@@ -3559,15 +3883,33 @@ python3 -m unittest discover -s tests
 
 ## 生成约定
 
-- 文件首行：`package <名字>`（ASCII 标识符）。
-- 入口：`fn main() { ... }`。
+- 经典写法文件首行 `package <名字>`（ASCII 标识符）、入口 `fn main()`；0.1c 可省略两者（顶层语句即入口）。
 - 只用规范中的 77 个硬关键字；不要发明关键字。
 - 遵循关键消歧规则：泛型用 `[]`、空映射 `{:}`、类用 `.new(...)` 构造、`->`/`=>`/`|>` 分工。
 - 若必须与外部符号同名，用反引号原始标识符 `` `name` ``。
 - 输出示例时使用 ```ds 代码块。
 
+
+## Ds+（plus 分支）与 dspm
+
+- **Ds+ 不是 base**：base `main` 只有 77 关键字；Ds+（`ds-plus` 分支）是严格超集，新增 16 个 `@` 令牌。
+  回答 base 问题时不要用 `@inb/@asm/@stack` 等；回答 Ds+ 问题时才可用，并遵守 profile/unsafe/常量/对齐规则。
+- Ds+ 文档在主仓库 `docs/DS-PLUS.md`；分支内有 `ds-plus/ROADMAP.md`、`ds-plus/docs/`。
+- 包管理 dspm：包 = GitHub 仓库，版本 = tag；命令 `./dspm install <user>/<repo>[@tag]`、`list`、`remove`、`update`、`cache-clean`。
+- 编译器 `use <module>` 解析到 `~/.ds/pkg`；C 驱动已原生支持，调用 `模块名.函数名`；缺失时提示 `dspm install <user>/<repo>`。
+- dspm 不执行包脚本；`@asm/@raw` 包标 unsafe，安装需确认（`--yes` 非交互）。
+
+验证命令补充：
+
+```bash
+python3 -m unittest tests.test_dspm -v
+sh c/test_dspm_use.sh
+ds-plus/bin/dsplus check <file> --profile bare
+```
+
 ## 不要做
 
 - 不要把 Ds 与 Rust/C++/Go 的语法混用（例如 `struct`/`const`/`let mut`/`<>` 泛型/`->` 当 lambda）。
-- 不要声称未实现的功能可直接运行；0.1 是定义稿 + 参考驱动（核心子集）。
+- 不要声称未实现的功能可直接运行；base 是定义稿 + 参考驱动（核心子集），Ds+ 后端仅 x86-64 子集。
+- 不要把 base 与 Ds+ 的能力混写（例如在 base 代码里用 `@inb`）。
 

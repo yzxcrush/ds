@@ -26,6 +26,8 @@
     <a href="#syntax">Syntax</a>
     <a href="#ai">For AI</a>
     <a href="#android">Android</a>
+    <a href="https://github.com/yzxcrush/ds/tree/ds-plus">Ds+</a>
+    <a href="https://github.com/yzxcrush/ds/blob/main/docs/DSPM.md">dspm</a>
     <a href="https://github.com/yzxcrush/ds">GitHub ↗</a>
   </nav>
 </header>
@@ -38,6 +40,7 @@
       <b>Ds</b> is a compact systems language: <b>77 hard keywords</b>, one semantics for
       <code>--app</code> and <code>--bare</code> targets, and <b>three interchangeable syntaxes</b>
       that cut AI generation cost by up to <b>49%</b>.
+      Strict-superset <b>Ds+</b> adds bare-metal tokens; <b>dspm</b> turns GitHub into the package registry.
       Not a re-skin of C/Java/Python/Rust/Go.
     </p>
     <div class="cta">
@@ -80,6 +83,18 @@
       <article class="card"><h3>Not a re-skin</h3>
         <p>Flow's combination of <code>\</code> sigils, whitespace application and dot-terminated blocks belongs
         to no mainstream compiled-language syntax family. Three surfaces, one semantics.</p></article>
+      <article class="card"><h3>Ds+ · strict superset</h3>
+        <p>Base <b>77 keywords stay frozen</b>. The <code>ds-plus</code> branch adds 16 <code>@</code> tokens
+        (12 hardware + 4 memory regions) with compat/bare profiles, an x86-64 subset backend, IR/ABI fingerprints
+        and S1–S18 superset gates. Base code still compiles unchanged.</p>
+        <p><a href="https://github.com/yzxcrush/ds/tree/ds-plus">Branch</a> ·
+           <a href="https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0">Release</a></p></article>
+      <article class="card"><h3>dspm · GitHub as registry</h3>
+        <p>Packages are GitHub repos, versions are git tags, source is distribution — <b>no central server</b>.
+        <code>./dspm install user/repo@tag</code> resolves deps, writes a lock with tag/commit/hash, works offline
+        from cache, never runs package scripts. The C driver natively resolves <code>use</code> to installed packages.</p>
+        <p><a href="https://github.com/yzxcrush/ds/blob/main/docs/DSPM.md">Spec</a> ·
+           <a href="https://github.com/yzxcrush/ds/tree/main/examples/packages/ds-hello">Example package</a></p></article>
     </div>
   </section>
 
@@ -152,6 +167,8 @@ fn main() {
 
 <footer>
   <div>Ds v0.1 · <a href="https://github.com/yzxcrush/ds">GitHub</a> ·
+    <a href="https://github.com/yzxcrush/ds/blob/main/docs/DS-PLUS.md">Ds+</a> ·
+    <a href="https://github.com/yzxcrush/ds/blob/main/docs/DSPM.md">dspm</a> ·
     <a href="https://github.com/yzxcrush/ds/blob/main/docs/WHY-DS.md">Why Ds</a> ·
     <a href="https://github.com/yzxcrush/ds/blob/main/README.en.md">English README</a> ·
     <a href="llms.txt">llms.txt</a></div>

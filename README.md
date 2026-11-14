@@ -22,6 +22,7 @@
 - 深度优先装依赖、缓存优先可离线、不执行任何包内脚本、unsafe 包需确认
 - **C 驱动已原生支持 `use`**：读取 `~/.ds/pkg` 安装布局，按 exports/targets 解析模块，缺失时提示 dspm install
 - 规范、安全说明、其它后端 `use` 解析伪代码、Android 集成方案：[docs/DSPM.md](docs/DSPM.md)
+- Ds+ 一页纸：[docs/DS-PLUS.md](docs/DS-PLUS.md) · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
 - 示例包：[examples/packages/ds-hello](examples/packages/ds-hello)
 
 ## 为什么是 Ds？
@@ -29,9 +30,11 @@
 一套语言覆盖 **应用 / 系统 / 裸机**，三档写法把 AI 生成成本压到最低，且每一步都能被三套参考实现执行验证：
 
 - **一套语义三种交付**：`--app` 应用、`--bare` 裸机、7 个交叉编译目标
+- **双分支**：Ds（77 冻结）/ **Ds+**（严格超集，16 个 `@` 硬件/区域令牌，x86-64 子集后端）
 - **能力密度**：77 硬关键字覆盖类型/内存/错误/并发/元编程/OOP/模式/裸机
 - **Token 效率**：常见程序 经典 137 → 精简 82（-31%）→ Flow 69（**-49%**）
 - **可预测**：显式内存五选一、确定性析构、错误分层、结构化并发、布局可控
+- **包管理**：**dspm** 用 GitHub 当包仓库（无中心服务器），C 驱动原生 `use` 解析
 - **AI 原生**：llms.txt + 语言卡 + 41 条 SFT + 25 项评测 + Python/C/App 三实现可对拍
 - **不是换皮**：Flow（`\` 定义 + 并置调用 + `.` 结束块）不属于任何主流编译语言语法家族
 

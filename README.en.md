@@ -16,9 +16,11 @@ juxtaposition application and `.`-terminated blocks.
 | Strength | What it means |
 |---|---|
 | One language, three deliverables | `--app`, `--bare` (no OS/GC), 7 cross-compile targets incl. thumbv7em / riscv32 / wasm32 |
+| Two branches | **Ds** (77 frozen keywords) and **Ds+** (strict superset, 16 `@` hardware/region tokens, x86-64 subset backend) |
 | Capability density | 77 keywords cover types, memory, errors, concurrency, metaprogramming, OOP, patterns, bare-metal |
 | Token efficiency | classic 137 → concise 82 (−31%) → **Flow 69 (−49%)** on common programs |
 | Predictability | static types, explicit memory (stack/alloc/rc/arc/gc), deterministic `drop`, layered errors, structured concurrency, layout control |
+| Package manager | **dspm**: GitHub repos are packages, tags are versions, no central server; C driver natively resolves `use` |
 | AI-native | `llms.txt` + language card + 41 SFT rows + 25 benchmark tasks + auto-grader; three implementations cross-checked |
 | Not a re-skin | Flow: `\` definitions, `p "hi"` juxtaposition calls, `.` block terminators |
 
@@ -51,6 +53,9 @@ python3 -m unittest discover -s tests     # 158 tests
 ./dscc examples/concise/fib.ds            # concise
 ./dscc examples/flow/fib.dsf              # Flow
 sh c/run_tests.sh                         # Python ↔ C differential tests
+./dspm install <user>/<repo>@v0.1.0       # package manager (GitHub as registry)
+sh c/test_dspm_use.sh                     # C driver use/dspm end-to-end
+# Ds+: git clone -b ds-plus … · docs/DS-PLUS.md
 ```
 
 ## AI learning kit

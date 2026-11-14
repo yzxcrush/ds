@@ -33,6 +33,23 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 
 经典/0.1c/Flow 三者可分别混用；Flow 相比 0.1c 再省约 15% token。详见 `spec/DS-FLOW.md`。
 
+## 0c. Ds+（plus 分支）与 dspm
+
+**Ds+ 是 Ds 的严格超集**（分支 `ds-plus`，base `main` 不受影响），新增 16 个 `@` 令牌：
+
+- 硬件 12：`@asm @inb @outb @inw @outw @inl @outl @rdmsr @wrmsr @rdcr @wrcr @mmio`
+- 区域 4：`@stack @static @raw @mmap`
+
+规则：硬件仅 `--bare`；`@asm`/端口 IO/MSR/CR/`@raw`/`@mmap` 需要 `@unsafe`；
+`@rdcr/@wrcr` 的 cr ∈ {0,2,3,4}；`@static` 初始化器必须常量；`@mmap` 字面量地址须页对齐。
+`compat` profile 保留全部 base 语义（严格超集），`bare` 无 GC/无语言运行时。
+
+**dspm（包管理）**：包 = GitHub 仓库，版本 = git tag；`./dspm install <user>/<repo>[@tag]`；
+`~/.ds/pkg/<user>/<repo>@<tag>/`、`~/.ds/dspm.lock`、`~/.ds/cache`；不执行包脚本，unsafe 包需确认。
+编译器 `use <module>` 解析到已安装包；C 驱动已原生支持，调用写成 `模块名.函数名`。
+
+详见 `docs/DS-PLUS.md`、`docs/DSPM.md`。
+
 ## 1. 定位
 
 Ds 是一门**静态类型、显式内存、可裸机运行、编译期可元编程**的系统级语言。
