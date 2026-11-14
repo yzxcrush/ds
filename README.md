@@ -20,7 +20,8 @@
 
 - `ds.toml` 声明包名/版本/exports/依赖/目标；lock 记录 tag+commit+tarball hash
 - 深度优先装依赖、缓存优先可离线、不执行任何包内脚本、unsafe 包需确认
-- 规范、安全说明、编译器 `use` 解析伪代码、Android 集成方案：[docs/DSPM.md](docs/DSPM.md)
+- **C 驱动已原生支持 `use`**：读取 `~/.ds/pkg` 安装布局，按 exports/targets 解析模块，缺失时提示 dspm install
+- 规范、安全说明、其它后端 `use` 解析伪代码、Android 集成方案：[docs/DSPM.md](docs/DSPM.md)
 - 示例包：[examples/packages/ds-hello](examples/packages/ds-hello)
 
 ## 为什么是 Ds？

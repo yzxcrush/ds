@@ -38,3 +38,4 @@ jobs:
         run: |
           make -C c
           sh c/run_tests.sh
+          sh c/test_dspm_use.sh

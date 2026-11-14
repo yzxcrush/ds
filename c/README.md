@@ -21,6 +21,23 @@ make -C c                 # 产物 c/build/ds
 - 核心子集：函数/递归/闭包、数组/映射、字符串/字节串、控制流、`|>`、`opt/res`?（否）、`match`?（否）
 - 明确**不支持**（会报错）：`class/trait/impl`、`match`、`opt/res`、`try/catch`、并发、内存原语、宏/comptime
 
+## 包（dspm）与 `use`
+
+C 驱动直接读取 dspm 安装布局（默认 `~/.ds`，可用 `DSPM_HOME` 覆盖）：
+
+```ds
+use hello
+p(hello.hello("Ds"))
+```
+
+- 扫描 `$DSPM_HOME/pkg/*/*/ds.toml`，按 `exports` 匹配模块，按 `targets` 过滤（base 接受 ds/cut/base/app/bare）；
+- 模块函数注册为 `模块名.函数名`（`use x as y` 可改命名空间）；
+- 递归加载模块内 `use`，去重防环；不联网、不调用 dspm 可执行文件；
+- 缺失诊断会提示 `dspm install <user>/<repo>`；
+- 仅导出函数；模块顶层 let 会求值但不暴露；不做版本选择（用已安装目录）。
+
+测试：`sh c/test_dspm_use.sh`（本地镜像装包 + use + 缺失诊断）。
+
 ## 对拍
 
 ```bash

@@ -109,7 +109,32 @@ JSON 格式（示例）：
 4. 扫描 `@asm/@raw` 等令牌 → `unsafe=true`；**需要 `--yes`**（或交互确认）才安装。
 5. 源码即分发：建议安装前 review 仓库；dspm 不做运行时沙箱。
 
-## 编译器 `use` 解析（伪代码）
+## 编译器 `use` 解析
+
+### C 驱动（已实现）
+
+`c/ds.c` 现在真正解析 `use`，不依赖 Python/dspm 可执行文件，也不联网：
+
+```text
+use hello
+p(hello.hello("Ds"))
+```
+
+行为：
+
+1. 解析 `use <module> [as 别名]`（`ND_USE` 节点）；
+2. 在 `DSPM_HOME`（默认 `~/.ds`）下扫描 `pkg/*/*/ds.toml`；
+3. 用极简 TOML 读取 `exports` / `targets`，匹配模块名（大小写不敏感）；
+4. 目标过滤：base C 驱动接受 `targets` 含 `ds`/`cut`/`base`/`app`/`bare`；仅 `plus` 的包跳过；
+5. 加载 `src/<export>.ds` / `src/<export>.dsf` / `<export>.ds`；
+6. 模块内 `use` 递归加载（去重防环）；模块函数注册为 `模块名.函数名`（别名可改命名空间）；
+7. 找不到时诊断：`找不到模块 \`x\`；请运行 dspm install <user>/<repo>（DSPM_HOME=...）`。
+
+注意：C 驱动当前只导出模块函数（模块顶层 let 会求值但不进入命名空间）；不做版本选择——用已安装目录（先到先得）。
+
+端到端测试：`sh c/test_dspm_use.sh`（file:// 本地镜像装包 → C 驱动解析执行 → 缺失模块诊断）。
+
+### 其他后端（参考伪代码）
 
 ```text
 function resolve_use(module_name, target):
@@ -125,11 +150,11 @@ function resolve_use(module_name, target):
     error("找不到模块 {module_name}；请运行 `dspm install <user>/<repo>`")
 ```
 
-编译器侧建议：
+Python/Android 后端接入时建议：
 
 1. 解析 `use JSON` → 模块名 `JSON`；
 2. 调 `dspm resolve JSON --target ds`（或直接读 lock，避免子进程）；
-3. 把返回文件加入本次编译单元 / 模块依赖图；
+3. 把返回文件加入编译单元 / 模块依赖图；
 4. 未找到时输出带安装提示的诊断（`DSPM2001`）；
 5. `--target` 与当前分支一致（Ds base = `ds`，Ds+ = `plus`）。
 

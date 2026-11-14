@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <glob.h>
+#include <sys/stat.h>
 
 #define DS_VERSION "0.1.0"
 #define DS_MAX_MSG 1024
@@ -461,7 +463,7 @@ enum {
     ND_IF, ND_WHILE, ND_LOOP, ND_FOR, ND_BREAK, ND_CONTINUE, ND_RETURN, ND_EXPRSTMT,
     ND_LIT_INT, ND_LIT_FLOAT, ND_LIT_STR, ND_LIT_BYTES, ND_LIT_BOOL,
     ND_ARRAY, ND_MAP, ND_VAR, ND_BINARY, ND_UNARY, ND_CALL, ND_INDEX,
-    ND_IFEXPR, ND_BLOCKEXPR, ND_LOOPEXPR
+    ND_IFEXPR, ND_BLOCKEXPR, ND_LOOPEXPR, ND_USE
 };
 
 typedef struct Node Node;
@@ -1398,6 +1400,39 @@ static Node *parse_expr(int min_prec) {
     return left;
 }
 
+static Node *parse_use(void) {
+    Tok *t = cur();
+    adv(); /* use */
+    skip_nl();
+    if (cur()->kind != TK_IDENT)
+        ds_fail(cur()->line, cur()->col, "use 后需要模块名");
+    Tok *p = cur();
+    char *name = xstrndup(p->s, (size_t)p->len);
+    adv();
+    while (is_op(".") && peek(1)->kind == TK_IDENT) {
+        adv();
+        Tok *part = cur();
+        name = xsprintf("%s.%s", name, xstrndup(part->s, (size_t)part->len));
+        adv();
+    }
+    Node *n = node_new(ND_USE, t->line, t->col);
+    n->name = name;
+    skip_nl();
+    if (is_kw("as")) {
+        adv();
+        skip_nl();
+        if (cur()->kind != TK_IDENT)
+            ds_fail(cur()->line, cur()->col, "as 后需要别名");
+        Tok *a = cur();
+        Node *alias = node_new(ND_LIT_STR, a->line, a->col);
+        alias->s = xstrndup(a->s, (size_t)a->len);
+        alias->slen = a->len;
+        n->a = alias;
+        adv();
+    }
+    return n;
+}
+
 static Node *parse_program(int repl_mode) {
     P_POS = 0;
     Node *prog = node_new(ND_PROGRAM, 1, 1);
@@ -1420,6 +1455,7 @@ static Node *parse_program(int repl_mode) {
         }
         Node *item = NULL;
         if (g_flow && cur()->kind == TK_OP && strcmp(cur()->s, "\\") == 0) item = parse_fn_flow();
+        else if (is_kw("use")) item = parse_use();
         else if (is_kw("fn")) item = parse_fn();
         else if (is_kw("let") || is_kw("var")) item = parse_let(1);
         else item = parse_stmt(0);   /* 隐式入口：顶层语句 */
@@ -2315,10 +2351,198 @@ static Value *call_value(Value *callee, Value **args, int nargs, int line, int c
 /* ------------------------------------------------------------------ */
 static int g_had_top_stmts = 0;
 
+
+/* ---------------- dspm 包解析（C 驱动） ---------------- */
+static const char *dspm_home(void) {
+    static char buf[4096];
+    const char *e = getenv("DSPM_HOME");
+    if (e && *e) {
+        snprintf(buf, sizeof buf, "%s", e);
+    } else {
+        const char *h = getenv("HOME");
+        snprintf(buf, sizeof buf, "%s/.ds", h ? h : ".");
+    }
+    size_t n = strlen(buf);
+    while (n > 1 && buf[n - 1] == '/') buf[--n] = '\0';
+    return buf;
+}
+
+static char *read_text_file(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); return NULL; }
+    rewind(f);
+    char *buf = (char *)xalloc((size_t)sz + 1);
+    size_t got = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[got] = '\0';
+    return buf;
+}
+
+/* 极简 TOML 数组提取：key = ["a", "b"] */
+static int toml_array(const char *text, const char *key, char out[][128], int cap) {
+    const char *p = strstr(text, key);
+    if (!p) return 0;
+    p = strchr(p, '=');
+    if (!p) return 0;
+    p = strchr(p, '[');
+    if (!p) return 0;
+    p++;
+    int n = 0;
+    while (*p && *p != ']' && n < cap) {
+        if (*p == '"') {
+            p++;
+            int len = 0;
+            while (*p && *p != '"' && len < 127) {
+                if (*p == '\\' && p[1]) p++;
+                out[n][len++] = *p++;
+            }
+            out[n][len] = '\0';
+            n++;
+            if (*p == '"') p++;
+        } else {
+            p++;
+        }
+    }
+    return n;
+}
+
+static int module_targets_ok(const char *toml) {
+    char targets[32][128];
+    int n = toml_array(toml, "targets", targets, 32);
+    if (n == 0) return 1;   /* 未声明：默认 app */
+    for (int i = 0; i < n; i++) {
+        if (strcasecmp(targets[i], "ds") == 0 || strcasecmp(targets[i], "cut") == 0 ||
+            strcasecmp(targets[i], "base") == 0 || strcasecmp(targets[i], "app") == 0 ||
+            strcasecmp(targets[i], "bare") == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static int resolve_module_file(const char *module, char *out, size_t out_sz) {
+    const char *mod = strrchr(module, '.');
+    mod = mod ? mod + 1 : module;
+    char pattern[4096];
+    snprintf(pattern, sizeof pattern, "%s/pkg/*/*/ds.toml", dspm_home());
+    glob_t g;
+    memset(&g, 0, sizeof g);
+    if (glob(pattern, 0, NULL, &g) != 0) return 0;
+    int found = 0;
+    for (size_t i = 0; i < g.gl_pathc && !found; i++) {
+        char *toml = read_text_file(g.gl_pathv[i]);
+        if (!toml) continue;
+        char exports[64][128];
+        int ne = toml_array(toml, "exports", exports, 64);
+        int match = (ne == 0);
+        for (int j = 0; j < ne; j++)
+            if (strcasecmp(exports[j], mod) == 0) { match = 1; break; }
+        if (!match || !module_targets_ok(toml)) { continue; }
+        char pkgdir[4096];
+        snprintf(pkgdir, sizeof pkgdir, "%s", g.gl_pathv[i]);
+        char *slash = strrchr(pkgdir, '/');
+        if (slash) *slash = '\0';
+        const char *modname = (ne > 0 && strcasecmp(exports[0], mod) == 0) ? exports[0] : mod;
+        static const char *fmts[] = {"%s/src/%s.ds", "%s/src/%s.dsf", "%s/%s.ds", NULL};
+        for (int k = 0; fmts[k] && !found; k++) {
+            char cand[4096];
+            snprintf(cand, sizeof cand, fmts[k], pkgdir, modname);
+            if (access(cand, R_OK) == 0) {
+                snprintf(out, out_sz, "%s", cand);
+                found = 1;
+            }
+        }
+    }
+    globfree(&g);
+    return found;
+}
+
+static void load_module_file(const char *path, const char *ns) {
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] load %s as %s\n", path, ns);
+    static char loaded[256][256];
+    static int nloaded = 0;
+    for (int i = 0; i < nloaded; i++)
+        if (strcmp(loaded[i], ns) == 0) return;
+    if (nloaded >= 256)
+        ds_fail(1, 1, "模块加载层数超过上限");
+    int save_flow = g_flow;
+    Tok *save_toks = g_toks;
+    int save_n = g_ntoks, save_cap = g_captoks, save_pos = P_POS;
+    char *src = read_text_file(path);
+    if (!src) ds_fail(1, 1, "无法读取模块：%s", path);
+    setup_flow(path, src);
+    g_ntoks = 0;       /* 关键：重置 token 计数，避免复用外层 token */
+    lex_source(src);
+    P_POS = 0;
+    Node *prog = parse_program(0);
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] parsed %s items=%d\n", ns, prog->nitems);
+    /* 模块内的 use 先加载 */
+    for (int i = 0; i < prog->nitems; i++)
+        if (prog->items[i]->kind == ND_USE) {
+            Node *u = prog->items[i];
+            char target[4096];
+            if (!resolve_module_file(u->name, target, sizeof target))
+                ds_fail(u->line, u->col,
+                        "找不到模块 `%s`；请运行 `dspm install <user>/<repo>`（DSPM_HOME=%s）",
+                        u->name, dspm_home());
+            const char *child_ns = u->a ? u->a->s : u->name;
+            const char *dot = strrchr(u->name, '.');
+            if (!u->a && dot) child_ns = dot + 1;
+            load_module_file(target, child_ns);
+        }
+    Env *mod_env = env_new(g_global);
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] mod_env %s\n", ns);
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *fn = prog->items[i];
+        if (fn->kind == ND_FN)
+            env_def(mod_env, fn->name, v_func(fn, mod_env, fn->name), 0);
+    }
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *item = prog->items[i];
+        if (item->kind == ND_LET) {
+            Value *val = item->a ? eval(mod_env, item->a) : v_unit();
+            env_def(mod_env, item->name, val, item->bval);
+        }
+    }
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *fn = prog->items[i];
+        if (fn->kind == ND_FN) {
+            char *exposed = xsprintf("%s.%s", ns, fn->name);
+            env_def(g_global, exposed, v_func(fn, mod_env, fn->name), 0);
+        }
+    }
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] exported %s\n", ns);
+    snprintf(loaded[nloaded], sizeof loaded[nloaded], "%s", ns);
+    nloaded++;
+    g_flow = save_flow;
+    g_toks = save_toks;
+    g_ntoks = save_n;
+    g_captoks = save_cap;
+    P_POS = save_pos;
+}
+
+static void load_use_item(Node *item) {
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] use %s\n", item->name);
+    char path[4096];
+    if (!resolve_module_file(item->name, path, sizeof path))
+        ds_fail(item->line, item->col,
+                "找不到模块 `%s`；请运行 `dspm install <user>/<repo>`（DSPM_HOME=%s）",
+                item->name, dspm_home());
+    const char *ns = item->a ? item->a->s : item->name;
+    const char *dot = strrchr(item->name, '.');
+    if (!item->a && dot) ns = dot + 1;
+    load_module_file(path, ns);
+}
+
 static void run_program(Node *prog, int repl_mode, Value **out_last) {
     Value *last = v_unit();
     g_had_top_stmts = 0;
-    /* 先注册所有函数（隐式入口允许函数在语句之后定义） */
+    /* 先解析 use（dspm 包） */
+    for (int i = 0; i < prog->nitems; i++)
+        if (prog->items[i]->kind == ND_USE) load_use_item(prog->items[i]);
+    /* 再注册所有函数（隐式入口允许函数在语句之后定义） */
     for (int i = 0; i < prog->nitems; i++) {
         Node *item = prog->items[i];
         if (item->kind == ND_FN)
@@ -2334,7 +2558,8 @@ static void run_program(Node *prog, int repl_mode, Value **out_last) {
     /* 最后按顺序执行顶层语句 */
     for (int i = 0; i < prog->nitems; i++) {
         Node *item = prog->items[i];
-        if (item->kind == ND_FN || item->kind == ND_LET || item->kind == ND_PACKAGE) continue;
+        if (item->kind == ND_FN || item->kind == ND_LET || item->kind == ND_PACKAGE ||
+            item->kind == ND_USE) continue;
         g_pending = FLOW_NORMAL;
         g_had_top_stmts = 1;
         Value *stmt_val = v_unit();
