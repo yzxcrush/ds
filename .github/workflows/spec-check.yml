@@ -29,3 +29,7 @@ jobs:
           python3 tools/make_datasets.py --check
           python3 tools/build_ai_kit.py --check
           python3 tools/ds_bench.py --list > /dev/null
+      - name: C 驱动构建与对拍
+        run: |
+          make -C c
+          sh c/run_tests.sh

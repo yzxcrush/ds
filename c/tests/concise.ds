@@ -1,0 +1,13 @@
+# 0.1c 精简写法（C 驱动）
+p("hello, concise")
+fn add(a,b)=a+b
+let r=add(2,3)
+p(f"r={r}")
+var total=0
+for i in 1..6: total+=i
+p(f"total={total}")
+fn sign(n): println(f"n={n}")
+sign(-3)
+let xs=[1 2 3]
+xs[0]+=10
+p(xs)

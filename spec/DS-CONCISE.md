@@ -145,7 +145,7 @@ println("hello, Ds")
 | `spec/DS-v0.1.md` 语义 | ✅ | ✅（本档） |
 | Python 参考驱动 `dsv01` | ✅ | ✅ |
 | 词法自检 `tools/dslex.py` | ✅ | ✅（新 token 已可识别） |
-| C 参考驱动（`c/`，进行中） | 部分 | 待跟进 |
+| C 参考驱动（`c/`，核心子集） | ✅ | ✅ |
 | Android App 内核（`assets/ds.js`） | ✅ | 待跟进 |
 
 ## 5. 建议用法

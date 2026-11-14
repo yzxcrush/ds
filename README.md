@@ -10,6 +10,7 @@ python3 tools/ds_keywords.py build                     # 从规范文档生成 s
 python3 tools/ds_keywords.py check --json spec/keywords.json   # 覆盖/重复/类别/计数校验
 python3 tools/dslex.py                                # 词法自检 + 示例扫描
 python3 -m unittest tests.test_driver -v              # 驱动/语言特性/示例/CLI 测试
+make -C c && sh c/run_tests.sh                        # C 驱动构建 + 与 Python 对拍
 ```
 
 实测结果：
@@ -25,6 +26,12 @@ python3 -m unittest tests.test_driver -v              # 驱动/语言特性/示�
 ```
 
 ## 交付物
+
+| 文件 | 内容 |
+|---|---|
+| [`c/`](c/) | **C 参考驱动**（核心子集）：经典/精简/Flow 写法，`make -C c` 构建，与 Python 对拍 |
+
+
 
 | 文件 | 内容 |
 |---|---|

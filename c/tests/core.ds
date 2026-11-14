@@ -1,0 +1,73 @@
+# C 驱动核心子集测试
+package core
+
+fn fib(n: i32) -> i32 {
+    if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
+}
+
+fn add(a: i32, b: i32) -> i32 { a + b }
+
+fn double(x: i32) -> i32 { x * 2 }
+
+fn greet(name: str) -> str {
+    "hello, " + name
+}
+
+var counter = 0
+
+fn bump(n: i32) -> i32 {
+    counter = counter + n
+    counter
+}
+
+fn main() {
+    println(greet("Ds"))
+    println(1 + 2 * 3 - 4 / 2)
+    println(7 % 3)
+    println(fib(10))
+    println(add(20, 22))
+    println("ab" + "cd")
+
+    let xs = [10 20 30]
+    println(xs)
+    println(xs[1])
+    xs[1] = 99
+    println(xs)
+    for v in xs { println(v) }
+
+    let m = {"a": 1, "b": 2}
+    println(m)
+    println(m["b"])
+    m["c"] = 3
+    println(m["c"])
+
+    var total = 0
+    var i = 0
+    while i < 3 {
+        i = i + 1
+        if i == 2 { continue }
+        total = total + i
+    }
+    println(total)
+
+    var countdown = 3
+    loop {
+        countdown = countdown - 1
+        if countdown <= 0 { break }
+    }
+    println(countdown)
+
+    println(5 |> double |> add(1))
+    println(bump(2))
+    println(bump(3))
+    println(format("x={} y={}", 1, 2))
+    println(range(0, 5))
+    println(math.sqrt(81.0))
+    println(math.round(3.6))
+    let empty = {:}
+    let arr2 = [1, 2, 3]
+    println(arr2)
+    println(true && !false)
+    println((1 << 4) | 3)
+    println(~0)
+}
