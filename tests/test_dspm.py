@@ -20,13 +20,14 @@ class FakeGitHub:
     def add(self, owner: str, repo: str, tag: str, files: dict[str, str]):
         tgz = self.root / owner / repo / "archive" / "refs" / "tags" / f"{tag}.tar.gz"
         tgz.parent.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(tgz, "w:gz") as tar:
-            for rel, content in files.items():
-                p = pathlib.Path(tempfile.mkdtemp()) / rel
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_text(content, encoding="utf-8")
-                tar.add(p, arcname=f"{repo}-{tag}/{rel}")
-                shutil.rmtree(p.parents[len(p.parts) - len(rel.split('/')) - 1], ignore_errors=True)
+        with tempfile.TemporaryDirectory() as work:
+            base = pathlib.Path(work)
+            with tarfile.open(tgz, "w:gz") as tar:
+                for rel, content in files.items():
+                    p = base / rel
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(content, encoding="utf-8")
+                    tar.add(p, arcname=f"{repo}-{tag}/{rel}")
         return tgz
 
 
