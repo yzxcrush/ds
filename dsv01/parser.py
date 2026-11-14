@@ -163,9 +163,17 @@ def _type_label(ty) -> str:
 class Parser:
     """递归下降 + Pratt 表达式解析器。"""
 
-    def __init__(self, src: str = "", filename: str = "<source>"):
+    def __init__(self, src: str = "", filename: str = "<source>", flow: bool | None = None):
         self.src = src
         self.filename = filename
+        # 语法档：经典/精简 或 Flow（`\` 定义、并置调用、`.` 结束块）
+        stripped = src.lstrip()
+        self.flow = (
+            filename.endswith(".dsf")
+            or stripped.startswith("\\")
+            or stripped.startswith("#!flow")
+            if flow is None else flow
+        )
         self.toks = [t for t in tokenize(src, filename) if t.kind not in _COMMENT_KINDS]
         self.i = 0
         self.block_guard = 0
@@ -359,6 +367,8 @@ class Parser:
 
     def _at_item_start(self) -> bool:
         t = self.tok
+        if self.flow and t.kind == OP and t.text == "\\":
+            return True
         if t.kind == KEYWORD:
             if t.text == "@":
                 # `@unsafe { ... }` 是表达式/语句，不是项
@@ -405,6 +415,12 @@ class Parser:
             self.advance()
             self.skip_nl()
         t = self.tok
+        if self.flow and t.kind == OP and t.text == "\\":
+            fn = self.parse_fn_flow()
+            fn.vis = vis
+            fn.attrs = attrs
+            fn.line, fn.col = line, col
+            return fn
         if t.kind == KEYWORD:
             kw = t.text
             if kw in ("fn", "comptime", "irq"):
@@ -1160,6 +1176,8 @@ class Parser:
     # ------------------------------------------------------------------
     def parse_body(self) -> ast.Block:
         """精简写法：`{...}` 块，或 `:` 后单条语句（Python 风格）。"""
+        if self.flow:
+            return self.parse_flow_body()
         if self.at_punct("{"):
             return self.parse_block()
         if self.at_punct(":"):
@@ -1172,6 +1190,104 @@ class Parser:
         t = self.tok
         stmt = self.parse_stmt()
         return ast.Block(stmts=[stmt], line=t.line, col=t.col)
+
+    def _atom_start(self) -> bool:
+        t = self.tok
+        if self.flow and t.kind == OP and t.text == "?":
+            return True
+        if t.kind in (INT, FLOAT, STRING, FSTRING, BYTES):
+            return True
+        if t.kind in (IDENT, RAW_IDENT):
+            return True
+        if t.kind == PUNCT_KIND and t.text in ("(", "["):
+            return True
+        return False
+
+    def parse_flow_body(self) -> ast.Block:
+        """Flow 写法：语句块以 '.' 结束；也兼容 `{...}` / `:单语句`。"""
+        if self.at_punct("{"):
+            return self.parse_block()
+        if self.at_punct(":"):
+            t = self.tok
+            self.advance()
+            self.skip_nl()
+            return ast.Block(stmts=[self.parse_stmt()], line=t.line, col=t.col)
+        if self.tok.kind != NEWLINE:
+            t = self.tok
+            return ast.Block(stmts=[self.parse_stmt()], line=t.line, col=t.col)
+        t = self.tok
+        self.skip_seps()
+        stmts = []
+        while not self.at_eof():
+            if self.tok.kind == OP and self.tok.text == ".":
+                self.advance()
+                return ast.Block(stmts=stmts, line=t.line, col=t.col)
+            # `else` 属于外层 if：它本身可以结束 then 块
+            if self.at_kw("else"):
+                return ast.Block(stmts=stmts, line=t.line, col=t.col)
+            stmts.append(self.parse_stmt())
+            self.skip_seps()
+        self.error("Flow 语句块缺少 '.' 终止符", t)
+        return ast.Block(stmts=stmts, line=t.line, col=t.col)
+
+    def parse_flow_if(self, as_stmt: bool = False) -> ast.Stmt:
+        t = self.tok
+        self.advance()
+        cond = self.parse_expr()
+        then_block = self.parse_flow_body()
+        else_ = None
+        if self.at_punct(";"):
+            # 精简替代：`?c: a; b` 用 `;` 代替 `else`
+            self.advance()
+            else_ = self.parse_flow_body()
+        else:
+            self.skip_seps()
+            if self.at_kw("else"):
+                self.advance()
+                else_ = self.parse_flow_body()
+        node = ast.IfExpr(cond=cond, then_block=then_block, else_=else_, line=t.line, col=t.col)
+        if as_stmt:
+            return ast.ExprStmt(expr=node, line=t.line, col=t.col)
+        return node
+
+    def parse_fn_flow(self) -> ast.FnDecl:
+        t = self.tok
+        self.advance()  # '\'
+        name = self.parse_name()
+        params: list[ast.Param] = []
+        while True:
+            tk = self.tok
+            if tk.kind in (NEWLINE, EOF):
+                break
+            if tk.kind == KEYWORD or (tk.kind == OP):
+                break
+            if tk.kind not in (IDENT, RAW_IDENT):
+                break
+            pname = self.parse_name()
+            ptype = None
+            if self.at_punct(":"):
+                self.advance()
+                ptype = self.parse_type()
+            params.append(ast.Param(name=pname, type=ptype, line=tk.line, col=tk.col))
+        ret = None
+        if self.at_sym("->"):
+            self.advance()
+            ret = self.parse_type()
+        body = None
+        if self.at_sym("="):
+            self.advance()
+            self.skip_nl()
+            body = self.parse_expr()
+        elif self.at_punct(":"):
+            self.advance()
+            self.skip_nl()
+            body = ast.Block(stmts=[self.parse_stmt()], line=t.line, col=t.col)
+        else:
+            body = self.parse_flow_body()
+        return ast.FnDecl(
+            name=name, params=params, generics=[], ret=ret, body=body,
+            vis="priv", attrs=[], line=t.line, col=t.col,
+        )
 
     def parse_block(self) -> ast.Block:
         t = self.tok
@@ -1190,6 +1306,18 @@ class Parser:
     def parse_stmt(self) -> ast.Stmt:
         t = self.tok
         line, col = t.line, t.col
+        if self.flow and t.kind == OP and t.text == "?":
+            return self.parse_flow_if(as_stmt=True)
+        if self.flow and t.kind == OP and t.text == "^":
+            self.advance()
+            value = None
+            if not (
+                self.tok.kind in (NEWLINE, EOF)
+                or (self.tok.kind == OP and self.tok.text == ".")
+                or (self.tok.kind == PUNCT_KIND and self.tok.text == "}")
+            ):
+                value = self.parse_expr()
+            return ast.ReturnStmt(value=value, line=line, col=col)
         if self.at_kw("let") or self.at_kw("var"):
             return self.parse_let_stmt()
         if self.at_kw("while"):
@@ -1304,6 +1432,8 @@ class Parser:
     def _stmt_end(self) -> bool:
         t = self.tok
         if t.kind in (NEWLINE, EOF):
+            return True
+        if t.kind == OP and t.text == ".":
             return True
         if t.kind == PUNCT_KIND and t.text in (";", "}", ",", ")"):
             return True
@@ -1795,7 +1925,15 @@ class Parser:
                     fn=ast.Var(name="panic", line=line, col=col),
                     args=[operand], line=line, col=col,
                 )
-        return self.parse_postfix()
+        expr = self.parse_postfix()
+        if self.flow:
+            # 并置调用：p "hi" / add x y / f (x+1)
+            while self._atom_start():
+                args = []
+                while self._atom_start():
+                    args.append(self.parse_postfix())
+                expr = ast.Call(fn=expr, args=args, line=t.line, col=t.col)
+        return expr
 
     def parse_sizeof_like(self, cls):
         t = self.tok
@@ -1936,6 +2074,8 @@ class Parser:
     def parse_primary(self) -> ast.Expr:
         t = self.tok
         line, col = t.line, t.col
+        if self.flow and t.kind == OP and t.text == "?":
+            return self.parse_flow_if()
         if t.kind in (INT, FLOAT, STRING, BYTES):
             self.advance()
             return ast.Lit(value=t.text, line=line, col=col)

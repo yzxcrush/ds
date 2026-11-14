@@ -1,0 +1,7 @@
+var total=0
+for i in 1..6: total+=i
+p f"total={total}"
+
+\add a b = a+b
+p add(2,3)
+p ?total>10: "big"; "small"

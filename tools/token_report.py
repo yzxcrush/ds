@@ -84,6 +84,45 @@ println(f"total={total} div={div(6,3)}")"""),
 ]
 
 
+FLOW_PAIRS = [
+    ("hello world", """package hello
+fn main() {
+    println("hello, Ds")
+}""", 'println("hello, Ds")', 'p "hello, Ds"'),
+    ("斐波那契", """package demo
+fn fib(n: i32) -> i32 {
+    if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
+}
+fn main() {
+    for i in range(0, 10) {
+        println(str(fib(i)))
+    }
+}""", """fn fib(n)=if n<2: n else fib(n-1)+fib(n-2)
+for i in 0..10: println(f"fib({i})={fib(i)}")""", """\\fib n = ?n<2: n; fib(n-1)+fib(n-2)
+for i in 0..10: p f"fib({i})={fib(i)}"
+"""),
+    ("累加 + 调用", """package demo
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+fn main() {
+    var total = 0
+    for i in range(1, 6) { total = total + i }
+    println(total)
+    println(add(2, 3))
+}""", """var total=0
+for i in 1..6: total+=i
+println(f"total={total}")
+fn add(a,b)=a+b
+println(add(2,3))""", """var total=0
+for i in 1..6: total+=i
+p f"total={total}"
+\\add a b = a+b
+p add(2,3)
+"""),
+]
+
+
 def count(src: str) -> tuple[int, int]:
     toks = [t for t in tokenize(src) if t.kind not in (COMMENT, NEWLINE)]
     return len(toks), len(src)
@@ -100,6 +139,21 @@ def main() -> int:
         tot_b += b
         print(f"| {name} | {a} | {b} | -{100 * (a - b) // a}% | {ca} | {cb} |")
     print(f"| **合计** | **{tot_a}** | **{tot_b}** | **-{100 * (tot_a - tot_b) // tot_a}%** | | |")
+
+    print()
+    print("### Flow 写法（并置调用 + `.` 结束块 + `\\` 定义）")
+    print("| 场景 | 经典 token | 0.1c token | Flow token | vs 经典 | vs 0.1c |")
+    print("|---|---|---|---|---|---|")
+    ta = tb = tc = 0
+    for name, classic, concise, flow in FLOW_PAIRS:
+        a, _ = count(classic)
+        b, _ = count(concise)
+        c, _ = count(flow)
+        ta += a
+        tb += b
+        tc += c
+        print(f"| {name} | {a} | {b} | {c} | -{100 * (a - c) // a}% | -{100 * (b - c) // b}% |")
+    print(f"| **合计** | **{ta}** | **{tb}** | **{tc}** | **-{100 * (ta - tc) // ta}%** | **-{100 * (tb - tc) // tb}%** |")
     return 0
 
 

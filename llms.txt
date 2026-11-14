@@ -7,6 +7,7 @@
 ## 核心文档
 
 - [精简写法（0.1c，省 token 默认推荐）](spec/DS-CONCISE.md)
+- [Flow 写法（结构性最省 token）](spec/DS-FLOW.md)
 - [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
 - [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
 - [机器可读关键词表 spec/keywords.json](spec/keywords.json)

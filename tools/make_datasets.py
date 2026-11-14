@@ -107,6 +107,13 @@ SFT = [
     ("把这段经典写法改成最省 token 的精简写法：\n```ds\npackage demo\nfn add(a: i32, b: i32) -> i32 {\n    a + b\n}\nfn main() {\n    println(add(2, 3))\n}\n```",
      "```ds\nfn add(a,b)=a+b\nprintln(add(2,3))\n```\n\n省去 package/fn main、参数与返回类型、花括号与 return。"),
 
+
+    ("用最省 token 的 Flow 写法写 hello。",
+     "```dsf\np \"hello, Ds\"\n```\n\n`.dsf` 文件或首行 `#!flow` 启用 Flow；`p` 是 println 的短别名，调用靠并置。"),
+    ("用 Flow 写法写斐波那契（表达式函数体 + 内联条件）。",
+     "```dsf\n\\fib n = ?n<2: n; fib(n-1)+fib(n-2)\nfor i in 0..10: p f\"fib({i})={fib(i)}\"\n```"),
+    ("Flow 写法的多语句函数和 '.' 结束块怎么写？",
+     "```dsf\n\\greet name\n    p f\"hello, {name}\"\n    p \"multi-line body\"\n.\ngreet \"Ds\"\n```\n\n多语句块用单独一行 `.` 结束；单语句可用 `:` 内联。"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -382,6 +389,13 @@ fn main() {
     ("fstr_c", "f-string（精简）", "用精简写法打印 ans=42（x=7，x*6）。",
      'let x=7\nprintln(f"ans={x*6}")\n'),
 
+
+    ("flow_hello", "Hello（Flow）", "用 Flow 写法输出 hello, Ds!（首行 #!flow）。",
+     '#!flow\np "hello, Ds!"\n'),
+    ("flow_fib", "斐波那契（Flow）", "用 Flow 写法打印 fib(10)。",
+     '\\fib n = ?n<2: n; fib(n-1)+fib(n-2)\np fib(10)\n'),
+    ("flow_sum", "累加（Flow）", "用 Flow 写法计算 1..5 的和并打印 total=15。",
+     '#!flow\nvar total=0\nfor i in 1..6: total+=i\np f"total={total}"\n'),
 ]
 
 # ---------------------------------------------------------------------------

@@ -2,9 +2,9 @@
 
 | 数据 | 条数 | 用途 |
 |---|---|---|
-| `ds_sft.jsonl` | 38 | 指令微调（system + user + assistant，含 ```ds 代码） |
+| `ds_sft.jsonl` | 41 | 指令微调（system + user + assistant，含 ```ds 代码） |
 | `ds_corpus.jsonl` | 10 | 语料 / RAG（语言卡、关键词、语法、语义、FAQ） |
-| `ds_bench.jsonl` | 22 | 评测（prompt + 参考 stdout，覆盖核心特性） |
+| `ds_bench.jsonl` | 25 | 评测（prompt + 参考 stdout，覆盖核心特性） |
 
 - 系统提示词：`ai/system_prompt.txt`
 - 生成脚本：`tools/make_datasets.py`（bench 预期输出由参考驱动实跑生成，保证可复现）

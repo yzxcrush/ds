@@ -192,6 +192,33 @@ println("hello, Ds")
 实测常见程序平均省 **31%** token（hello 省 61%，错误处理省 45%）；`python3 tools/token_report.py` 可复跑。
 完整规则：[spec/DS-CONCISE.md](spec/DS-CONCISE.md)。
 
+## Flow 写法（结构性精简，非换皮）
+
+在 0.1c 之上再加一档 **Flow**：函数 `\` 定义、参数空白分隔、调用靠并置、多语句块用 `.` 结束、
+条件用 `?`、返回用 `^`——没有 `{}`、没有 `fn main`、没有逗号参数表。
+
+```dsf
+# examples/flow/hello.dsf
+p "hello, Ds"
+```
+
+```dsf
+# examples/flow/fib.dsf
+\fib n = ?n<2: n; fib(n-1)+fib(n-2)
+for i in 0..10: p f"fib({i})={fib(i)}"
+```
+
+| 场景 | 经典 | 0.1c | Flow | vs 经典 | vs 0.1c |
+|---|---|---|---|---|---|
+| hello world | 13 | 5 | 3 | -76% | -40% |
+| 斐波那契 10 项 | 64 | 38 | 34 | -46% | -10% |
+| 累加 + 调用 | 60 | 39 | 32 | -46% | -17% |
+| **合计** | **137** | **82** | **69** | **-49%** | **-15%** |
+
+识别方式：文件名 `.dsf`、文件以 `\` 开头、或首行 `#!flow`；普通 `.ds` 不受影响。
+完整规则与「为什么不是换皮」：[spec/DS-FLOW.md](spec/DS-FLOW.md)。
+示例：[examples/flow/](examples/flow/)。
+
 ## 全量关键词表（77 项速查）
 
 | 类别 | 数 | 关键词 |

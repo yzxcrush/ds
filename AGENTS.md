@@ -2,7 +2,7 @@
 
 你是要使用 / 学习 / 生成 Ds v0.1 代码的 AI Agent。请按以下顺序获取上下文：
 
-0. **写代码优先用 0.1c 精简写法**（`spec/DS-CONCISE.md`）：无 package/fn main、`fn f(a,b)=a+b`、`for i in 0..n: ...`、`+=`、`f"{x}"`。
+0. **写代码优先用 0.1c 精简写法；要极限省 token 用 Flow（`.dsf`：\ 定义/并置调用/. 结束块）**（`spec/DS-CONCISE.md`）：无 package/fn main、`fn f(a,b)=a+b`、`for i in 0..n: ...`、`+=`、`f"{x}"`。
 1. **先读** `ai/LANGUAGE_CARD.md`（约 5k token，含全部 77 关键字、语法、语义、示例）。
 2. 需要精确细节时读 `spec/DS-v0.1.md`（完整规范，含每个关键字的形式/语义/示例）。
 3. 机器可读索引：`spec/keywords.json`（77 词 + 形式 + 语义 + 示例）。

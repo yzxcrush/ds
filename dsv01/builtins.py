@@ -739,6 +739,11 @@ def make_prelude(interp) -> dict[str, Any]:
         "math": make_math_module(),
     }
     prelude.update(native_constructors(interp))
+    # 短别名（Flow/精简写作用；用户可用同名绑定遮蔽）
+    prelude.setdefault("p", prelude["println"])
+    prelude.setdefault("s", prelude["str"])
+    prelude.setdefault("l", prelude["len"])
+    prelude.setdefault("r", prelude["range"])
     return prelude
 
 

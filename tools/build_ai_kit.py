@@ -32,6 +32,7 @@ def run_example(path: Path) -> str:
 def build() -> str:
     card = read("ai/LANGUAGE_CARD.md")
     concise = read("spec/DS-CONCISE.md")
+    flow = read("spec/DS-FLOW.md")
     spec = read("spec/DS-v0.1.md")
     llms = read("llms.txt")
     keywords = read("spec/keywords.json")
@@ -57,7 +58,11 @@ def build() -> str:
         "",
         concise,
         "",
-        "## 2b. Language Card",
+        "## 2b. Flow 写法（结构性最省 token）",
+        "",
+        flow,
+        "",
+        "## 2c. Language Card",
         "",
         card,
         "",
