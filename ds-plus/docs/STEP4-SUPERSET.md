@@ -22,6 +22,9 @@
 | **S13** | base 编译器可编译 base 三档示例 | `--compile` 冒烟 | 阻断 |
 | **S14** | P1 前端：base AST 等价 + 16 令牌注入 | `dsplus.frontend` | 阻断 |
 | **S15** | P1 前端：三档写法 plus AST 特征一致 | `dsplus.frontend` | 阻断 |
+| **S16** | P2 语义检查 + compat 模拟执行 | `dsplus.checker/compat` | 阻断 |
+| **S17** | P3 IR 超集稳定 + ABI 指纹 | `dsplus.ir` | 阻断 |
+| **S18** | P4 x86-64 子集后端（ELF/raw） | `dsplus.codegen` | 阻断 |
 
 ## 2. 运行
 
@@ -47,10 +50,10 @@ python3 -m unittest discover -s ds-plus/tests -v
 
 | 阶段 | 证明方式 | 当前状态 |
 |---|---|---|
-| P0 结构与关键字 | S1–S12 | ✅ 本步完成 |
+| P0 结构与关键字 | S1–S18 | ✅ 本步完成 |
 | P1 语法超集 | base 全部 `.ds/.dsf` 同时送 base 与 Ds+（compat）前端，比较 token→AST 摘要 | ✅ **前端已实现**（S14/S15）；全量 corpus 比对待扩 |
-| P2 语义超集 | 同一输入两实现执行结果逐字节比对（复用 `c/run_tests.sh` 模式） | 待 Ds+ 运行时/后端 |
-| P3 ABI 超集 | base 程序在 Ds+ 下产物的 ABI 指纹与 base 一致 | 待机器码后端 |
+| P2 语义超集 | checker + compat 模拟执行（S16）；完整类型检查待补 | ✅ 规则级完成 |
+| P3 ABI 超集 | IR 哈希 + ABI 指纹（S17）；机器码 ABI 待扩展 | ✅ 指纹级完成 |
 
 **规则**：P1–P3 任一未完成，Ds+ 不得标记为「严格超集已验证」，只能标记「结构契约通过」。
 

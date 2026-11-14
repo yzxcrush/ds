@@ -103,10 +103,23 @@ fn f() {
         self.assertEqual(sorted(f[1] for f in feats if f[0] == "Region"),
                          ["@mmap", "@raw", "@static"])
 
-    def test_asm_operand_form_rejected(self):
-        with self.assertRaises(DsPlusError) as cm:
-            parse_program('fn f() { @asm volatile("mov %0", "r"(1)) }\n', "x.ds")
-        self.assertEqual(cm.exception.code, "E_DS_PLUS_ASM_FORM_P1")
+    def test_asm_operand_inputs(self):
+        prog = parse_program('@unsafe fn f() { @asm volatile("mov %0, %1", 1, 2) }\n', "x.ds")
+        asm = [f for f in collect_plus_features(prog) if f[0] == "InlineAsm"]
+        self.assertEqual(asm, [("InlineAsm", "mov %0, %1", True)])
+        nodes = []
+
+        def walk(x):
+            if isinstance(x, list):
+                for i in x: walk(i)
+                return
+            if dataclasses.is_dataclass(x):
+                if type(x).__name__ == "InlineAsm":
+                    nodes.append(x)
+                for f in dataclasses.fields(x):
+                    walk(getattr(x, f.name))
+        walk(prog)
+        self.assertEqual(len(nodes[0].inputs), 2)
 
     def test_bad_arity_rejected(self):
         with self.assertRaises(DsPlusError) as cm:

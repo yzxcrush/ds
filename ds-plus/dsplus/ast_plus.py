@@ -32,6 +32,7 @@ class InlineAsm(ast.Expr):
 
     template: str = ""
     volatile: bool = False
+    inputs: list[Any] = field(default_factory=list)
     line: int = 0
     col: int = 0
 

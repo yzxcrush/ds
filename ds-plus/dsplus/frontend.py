@@ -190,14 +190,15 @@ def _convert_call(node: ast.Call, asm_meta: list[dict]) -> Any:
     if placeholder in ("__dsplus_asm", "__dsplus_asm_v"):
         if node.kwargs:
             raise DsPlusError("E_DS_PLUS_ASM_FORM_P1", "@asm 的 P1 前端不支持命名参数", node.line, node.col)
-        if len(node.args) != 1 or not isinstance(node.args[0], ast.Lit) or not isinstance(node.args[0].value, str):
+        if not node.args or not isinstance(node.args[0], ast.Lit) or not isinstance(node.args[0].value, str):
             raise DsPlusError(
                 "E_DS_PLUS_ASM_FORM_P1",
-                "@asm P1 仅支持 `@asm(\"...\")` / `@asm volatile(\"...\")`；带操作数/约束的形式在 P2 实现",
+                "@asm 需要字符串模板：`@asm(\"...\"[, 输入...])`",
                 node.line, node.col)
         return ast_plus.InlineAsm(
             template=node.args[0].value,
             volatile=placeholder.endswith("_v"),
+            inputs=list(node.args[1:]),
             line=node.line, col=node.col,
         )
 

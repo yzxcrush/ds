@@ -22,6 +22,11 @@ jobs:
         run: python3 ds-core/tools/build_registry.py --check
       - name: 严格超集校验
         run: python3 ds-plus/tools/superset_check.py --compile
+      - name: Ds+ CLI 冒烟
+        run: |
+          ds-plus/bin/dsplus --version
+          ds-plus/bin/dsplus check ds-plus/examples/p1_hardware.ds --profile bare
+          ds-plus/bin/dsplus abi > /dev/null
       - name: AI 学习包一致性
         run: |
           python3 tools/make_datasets.py --check

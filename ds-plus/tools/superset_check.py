@@ -152,6 +152,52 @@ def checks(compile_base: bool = False):
     a, b, d = feat(classic, "a.ds"), feat(concise, "b.ds"), feat(flow, "c.dsf")
     add("S15", "P1 三档写法共享 plus AST 特征", a == b == d, f"classic={a['regions']}, flow={d['regions']}")
 
+
+    # S16 P2：语义检查 + compat 模拟执行
+    from dsplus.checker import check_program  # type: ignore
+    from dsplus.compat import run_compat  # type: ignore
+    sim = '@unsafe fn main() { @outb(0x3F8, 65)\n p(@inb(0x3F8)) }\n'
+    _, machine, sim_out = run_compat(sim, "sim.ds", profile="bare")
+    unsafe_src = 'fn f() { @inb(0x60) }\n'
+    unsafe_codes = {d.code for d in check_program(parse_program(unsafe_src, "u.ds"), "bare")}
+    ok = (sim_out == "65\n" and machine.ports.get(0x3F8) == 65
+          and "E_DS_PLUS_UNSAFE" in unsafe_codes)
+    add("S16", "P2 语义检查 + compat 模拟", ok,
+        f"sim_out={sim_out!r}, unsafe={sorted(unsafe_codes)}")
+
+    # S17 P3：IR 超集稳定 + ABI 指纹
+    from dsplus.ir import abi_fingerprint, fingerprint_hash, ir_hash  # type: ignore
+    ok = True
+    detail = []
+    for rel in ("examples/concise/hello.ds", "examples/flow/fib.dsf"):
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        same = ir_hash(parse_program(src, rel)) == ir_hash(base_parse(src, rel))
+        ok = ok and same
+        detail.append(f"{rel}: {'same' if same else 'DIFF'}")
+    fp = abi_fingerprint("x86_64-linux-gnu")
+    ok = ok and fp["ds_default_layout"] == "repr(Ds)" and fp["pointer"]["size"] == 8
+    detail.append(f"abi={fingerprint_hash(fp)[:12]}")
+    add("S17", "P3 IR/ABI 超集稳定", ok, "; ".join(detail))
+
+    # S18 P4：x86-64 子集代码生成 → ELF/raw
+    import tempfile
+    from dsplus.codegen import build, generate_source  # type: ignore
+    asm = generate_source('@unsafe fn main() -> i32 { @outb(0x3F8, 65) return @inb(0x3F8) }\n', "io.ds")
+    ok = "outb %al, %dx" in asm and "inb %dx, %al" in asm
+    detail = ["asm ok"]
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            exe = pathlib.Path(td) / "p4.elf"
+            info = build("fn main() -> i32 { return 42 }\n", str(exe), raw=True)
+            data = exe.read_bytes()
+            ok = ok and data[:4] == b"\x7fELF" and int.from_bytes(data[18:20], "little") == 62
+            ok = ok and pathlib.Path(info["raw"]).stat().st_size > 0
+            detail.append(f"elf={len(data)}B, raw={pathlib.Path(info['raw']).stat().st_size}B")
+    except Exception as exc:  # 工具链缺失时 P4 门禁失败（CI 有工具链）
+        ok = False
+        detail.append(f"build error: {exc}")
+    add("S18", "P4 x86-64 子集后端（ELF/raw）", ok, "; ".join(detail))
+
     # S13（可选）base 编译器可编译 base 示例
     if compile_base:
         files = ["examples/concise/hello.ds", "examples/concise/fib.ds",

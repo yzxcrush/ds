@@ -1,0 +1,4 @@
+#!/bin/sh
+# Ds+ CLI 包装：python3 ds-plus/tools/dsplus_cli.py "$@"
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec python3 "$here/../tools/dsplus_cli.py" "$@"
