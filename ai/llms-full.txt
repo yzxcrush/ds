@@ -209,7 +209,7 @@ println("hello, Ds")
 | `spec/DS-v0.1.md` 语义 | ✅ | ✅（本档） |
 | Python 参考驱动 `dsv01` | ✅ | ✅ |
 | 词法自检 `tools/dslex.py` | ✅ | ✅（新 token 已可识别） |
-| C 参考驱动（`c/`，进行中） | 部分 | 待跟进 |
+| C 参考驱动（`c/`，核心子集） | ✅ | ✅ |
 | Android App 内核（`assets/ds.js`） | ✅ | 待跟进 |
 
 ## 5. 建议用法
@@ -409,7 +409,8 @@ show 0
 | Python 参考驱动 `dsv01` | ✅ 支持（`.dsf` / 开头 `\` / `#!flow` 自动识别） |
 | `dscc` / `ds` CLI | ✅ 直接运行 `.dsf` |
 | 词法/单测 | ✅ 新增 8 项 Flow 测试，全套 158 项通过 |
-| C 驱动 / Android App 内核 | 待跟进（经典/精简写法仍可用） |
+| C 驱动（核心子集） | ✅ 支持（`make -C c` + 对拍测试） |
+| Android App 内核 | 待跟进 |
 
 ## 7. 已知限制
 
