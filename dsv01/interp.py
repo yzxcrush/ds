@@ -217,6 +217,8 @@ class Interpreter:
         return self.run_program(program, run_main=run_main)
 
     def run_program(self, program: ast.Program, *, run_main: bool = True) -> Any:
+        from .checker import check_program
+        check_program(program)
         self.package = program.package
         env = self.globals
         base_dir = _dirname(program.filename)
