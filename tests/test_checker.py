@@ -61,6 +61,27 @@ class TestChecker(unittest.TestCase):
     def test_bad_string_concat(self):
         self.assert_error('p(1 + "x")\n', "类型不匹配")
 
+    def test_no_implicit_i32_to_u8(self):
+        self.assert_error(
+            "fn bar() {\n  let x: i32 = 1\n  let y: u8 = x\n}\nbar()\n",
+            "类型不匹配")
+
+    def test_no_implicit_u8_to_u32(self):
+        self.assert_error(
+            "fn bar() {\n  let x: u8 = 1\n  let y: u32 = x\n}\nbar()\n",
+            "类型不匹配")
+
+    def test_inferred_int_is_i32(self):
+        self.assert_error(
+            "fn bar() {\n  let x = 1\n  let y: u8 = x\n}\nbar()\n",
+            "类型不匹配")
+
+    def test_int_literal_can_initialize(self):
+        check("fn bar() {\n  let y: u8 = 1\n  let z: u16 = 1 + 1\n}\nbar()\n")
+
+    def test_explicit_cast(self):
+        check("fn bar() {\n  let x: i32 = 1\n  let y: u8 = x as u8\n}\nbar()\n")
+
 
 if __name__ == "__main__":
     unittest.main()

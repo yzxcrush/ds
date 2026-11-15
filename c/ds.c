@@ -2675,7 +2675,7 @@ static int sem_is_int(const char *t) {
     return strcmp(t,"i8")==0||strcmp(t,"i16")==0||strcmp(t,"i32")==0||
            strcmp(t,"i64")==0||strcmp(t,"u8")==0||strcmp(t,"u16")==0||
            strcmp(t,"u32")==0||strcmp(t,"u64")==0||strcmp(t,"isize")==0||
-           strcmp(t,"usize")==0||strcmp(t,"int")==0;
+           strcmp(t,"usize")==0||strcmp(t,"int")==0||strcmp(t,"intlit")==0;
 }
 static int sem_is_unit(const char *t) {
     return !t || strcmp(t,"unit")==0 || strcmp(t,"void")==0;
@@ -2683,7 +2683,11 @@ static int sem_is_unit(const char *t) {
 static int sem_compat(const char *actual, const char *expected) {
     if (!actual || !expected) return 1;
     if (sem_is_unit(expected)) return sem_is_unit(actual) || strcmp(actual,"?")==0;
-    if (sem_is_int(expected)) return sem_is_int(actual);
+    if (sem_is_int(expected)) {
+        if (!sem_is_int(actual)) return 0;
+        if (strcmp(actual,"intlit")==0) return 1;
+        return strcmp(actual, expected) == 0;
+    }
     if (strcmp(expected,"f32")==0||strcmp(expected,"f64")==0) return strcmp(actual,"float")==0;
     if (strcmp(expected,"bool")==0) return strcmp(actual,"bool")==0;
     if (strcmp(expected,"str")==0) return strcmp(actual,"str")==0;
@@ -2716,7 +2720,7 @@ static const char *sem_block_tail(Node *block, TypeEnv *env, Node *prog) {
 static const char *sem_infer(Node *e, TypeEnv *env, Node *prog) {
     if (!e) return "unit";
     switch (e->kind) {
-        case ND_LIT_INT: return "int";
+        case ND_LIT_INT: return "intlit";
         case ND_LIT_FLOAT: return "float";
         case ND_LIT_STR: return "str";
         case ND_LIT_BYTES: return "bytes";
@@ -2733,7 +2737,13 @@ static const char *sem_infer(Node *e, TypeEnv *env, Node *prog) {
             const char *a = sem_infer(e->a, env, prog), *b = sem_infer(e->b, env, prog);
             if (strcmp(op,"+")==0 && ((a&&strcmp(a,"str")==0)||(b&&strcmp(b,"str")==0))) return "str";
             if ((a&&strcmp(a,"float")==0)||(b&&strcmp(b,"float")==0)) return "float";
-            if (a||b) return "int";
+            if (sem_is_int(a) && sem_is_int(b)) {
+                if (strcmp(a,"intlit")==0 && strcmp(b,"intlit")==0) return "intlit";
+                if (strcmp(a,"intlit")==0) return b;
+                if (strcmp(b,"intlit")==0) return a;
+                if (strcmp(a,b)==0) return a;
+                return NULL;
+            }
             return NULL;
         }
         case ND_CALL: {
@@ -2777,7 +2787,8 @@ static void sem_check_stmt(Node *st, TypeEnv *env, Node *prog, const char *ret,
             if (st->type_name && !sem_compat(actual, st->type_name))
                 ds_fail(st->line, st->col, "`%s` 类型不匹配：标注 %s，实际 %s",
                         st->name, st->type_name, actual ? actual : "?");
-            te_set(env, st->name, st->type_name ? st->type_name : actual);
+            te_set(env, st->name, st->type_name ? st->type_name :
+                   (actual && strcmp(actual,"intlit")==0 ? "i32" : actual));
             return;
         }
         case ND_ASSIGN: {
@@ -2868,7 +2879,8 @@ static void check_semantics(Node *prog) {
             if (it->type_name && !sem_compat(actual, it->type_name))
                 ds_fail(it->line, it->col, "`%s` 类型不匹配：标注 %s，实际 %s",
                         it->name, it->type_name, actual ? actual : "?");
-            te_set(&top, it->name, it->type_name ? it->type_name : actual);
+            te_set(&top, it->name, it->type_name ? it->type_name :
+                   (actual && strcmp(actual,"intlit")==0 ? "i32" : actual));
         } else {
             sem_check_stmt(it, &top, prog, NULL, 0, 0, NULL);
         }

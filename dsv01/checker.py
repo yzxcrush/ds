@@ -80,7 +80,7 @@ def _lit_type(value: Any) -> str:
     if isinstance(value, bool):
         return "bool"
     if isinstance(value, int):
-        return "int"
+        return "intlit"
     if isinstance(value, float):
         return "float"
     if isinstance(value, str):
@@ -93,19 +93,19 @@ def _lit_type(value: Any) -> str:
 
 
 def _compat(actual: str | None, expected: str | None, lit: Any = None) -> bool:
-    if actual is None or expected is None:
+    if actual is None or actual == "?" or expected is None:
         return True
     if expected in UNIT_TYPES:
         return actual in ("unit", "?")
     if expected in INT_RANGES:
-        if actual not in ("int", "i32", "u32", "i64", "u64", "u8", "u16", "usize", "isize"):
-            return False
-        if isinstance(lit, bool):
-            return False
-        if isinstance(lit, int):
-            lo, hi = INT_RANGES[expected]
-            return lo <= lit <= hi
-        return True
+        if actual == "intlit":
+            if isinstance(lit, bool):
+                return False
+            if isinstance(lit, int):
+                lo, hi = INT_RANGES[expected]
+                return lo <= lit <= hi
+            return True
+        return actual == expected
     if expected in FLOAT_TYPES:
         return actual == "float"
     if expected == "bool":
@@ -199,7 +199,7 @@ class Checker:
         actual = self.infer(val, self.globals)
         if typ and not _compat(actual, typ, getattr(val, "value", None)):
             self.err(f"`{item.name}` 类型不匹配：标注 {typ}，实际 {actual or '?'}", item)
-        self.globals.types[item.name] = typ or actual
+        self.globals.types[item.name] = typ or ("i32" if actual == "intlit" else actual)
         if getattr(item, "mutable", False):
             self.globals.mutable.add(item.name)
 
@@ -258,7 +258,7 @@ class Checker:
                 self.err(f"`{st.name}` 类型不匹配：标注 {typ}，实际 {actual or '?'}", st)
             if st.name in scope.types:
                 self.err(f"同一作用域重复定义 `{st.name}`", st)
-            scope.types[st.name] = typ or actual
+            scope.types[st.name] = typ or ("i32" if actual == "intlit" else actual)
             if st.mutable:
                 scope.mutable.add(st.name)
             else:
@@ -381,10 +381,20 @@ class Checker:
                 return "str"
             if lt in ("bool", "str") or rt in ("bool", "str"):
                 self.err(f"`{e.op}` 不支持 {lt or '?'} 与 {rt or '?'}", e)
+            ints = set(INT_RANGES) | {"intlit"}
             if lt == "float" or rt == "float":
                 return "float"
-            if lt in ("int", "i32", "u32") or rt in ("int", "i32", "u32"):
-                return "int"
+            if lt in ints and rt in ints:
+                if lt == "intlit" and rt == "intlit":
+                    return "intlit"
+                if lt == "intlit":
+                    return rt
+                if rt == "intlit":
+                    return lt
+                if lt == rt:
+                    return lt
+                self.err(f"整数类型不同（{lt} 与 {rt}），需要显式 `as`", e)
+                return "?"
             return None
         if isinstance(e, ast.Unary):
             t = self.infer(e.expr, scope)
