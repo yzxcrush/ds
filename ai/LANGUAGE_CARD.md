@@ -55,8 +55,10 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 - Cut ⊂ Ds ⊂ Ds+；`--cut` / `--app` / `--plus` 三模式，用错层给 `E_CUT_LAYER_DS` / `E_CUT_LAYER_PLUS`。
 - Cut 冻结 16 token：`let fn if else while for return u8 u16 u32 i32 bool * @static @asm @irq`（中文别名仅文档）。
 - 禁指针算术、堆、浮点、字符串表达式、结构体/闭包/异常/并发；`@asm` 支持 `in("r0")/out("r0")`、纯汇编函数、文件级汇编。
+- 后端：Thumb 全子集；AArch64 **纯 @asm**（启动/上下文切换）；`cut/uf2.py` 生成 RP2350 UF2（family 0xE48BFF56）。
 - DsOS：RP2350 → Thumb/.uf2；Zero 2 W → AArch64/kernel8.img（不是 UF2）。
-- 详见 `spec/DS-CUT.md`、`docs/DSOS.md`。
+- **DSOSS**（DsOS Standard Specification）：C0–C4 一致性、双板 profile、manifest + 检查器；DsOS 是实现，DSOSS 是标准。
+- 详见 `spec/DS-CUT.md`、`docs/DSOS.md`、`spec/DSOSS.md`。
 
 ## 1. 定位
 
@@ -92,7 +94,7 @@ Ds 是一门**静态类型、显式内存、可裸机运行、编译期可元编
 - 字面量：`5` `-3` `0xFF` `0b1010` `"str"`（转义 `\n \r \t \\ \" \0 \xNN \u{...}`）
   `b"raw"`（原始字节串，不转义）、`[1 2 3]`（数组，空白或逗号分隔）、`{k:v}`（映射）、
   `{:}`（空映射）、`_`（占位）。
-- 无八进制、无字符字面量、无字符串插值。
+- 无八进制、无字符字面量；经典写法无插值，0.1c 使用 `f"{x}"`。
 
 ## 4. 语法骨架
 
