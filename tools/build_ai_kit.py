@@ -38,6 +38,7 @@ def build() -> str:
     dspm = read("docs/DSPM.md")
     cut = read("spec/DS-CUT.md")
     dsos = read("docs/DSOS.md")
+    dsoss = read("spec/DSOSS.md")
     spec = read("spec/DS-v0.1.md")
     llms = read("llms.txt")
     keywords = read("spec/keywords.json")
@@ -86,6 +87,10 @@ def build() -> str:
         "## 2g. DsOS 架构初稿",
         "",
         dsos,
+        "",
+        "## 2h. DSOSS 标准（DsOS Standard Specification）",
+        "",
+        dsoss,
         "",
         "## 2c. Language Card",
         "",

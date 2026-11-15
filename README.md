@@ -19,6 +19,8 @@ sh cut/test_build.sh          # clang 汇编 + ld.lld 链接冒烟
 - 规范：[spec/DS-CUT.md](spec/DS-CUT.md) ｜ 编译器：[cut/README.md](cut/README.md)
 - DsOS 架构：[docs/DSOS.md](docs/DSOS.md) ｜ 启动/上下文切换/链接脚本：[dsos/](dsos/)
 - 双目标（已纠正原任务冲突）：**RP2350 → Thumb/.uf2**；**Zero 2 W → AArch64/kernel8.img**
+- 后端：Thumb 全子集；AArch64 纯 `@asm`（启动/上下文切换）；`cut/uf2.py` 生成 RP2350 UF2
+- **DSOSS**（DsOS Standard Specification）：标准/一致性检查 → [spec/DSOSS.md](spec/DSOSS.md) · [dsoss/](dsoss/)
 - 层错误精确提示：`--cut` 用 Ds 关键字报 `E_CUT_LAYER_DS`；`--app` 用 Ds+ `@` 令牌报 `E_CUT_LAYER_PLUS`
 
 ## 包管理 dspm（原型）

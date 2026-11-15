@@ -1,0 +1,35 @@
+[standard]
+name = "DSOSS"
+version = "0.1"
+status = "draft"
+
+[board]
+profile = "zero2w-a53"
+
+[boot]
+entry = "_start"
+image_format = "kernel8"
+vector_base = 0x00080000
+stack_top = 0x00200000
+
+[kernel]
+arch = "aarch64"
+pointer_bits = 64
+page_size = 4096
+syscall_max = 32
+
+[toolchain]
+compiler = "cutc"
+backend = "aarch64"
+cut_mode = "--cut"
+reproducible = true
+
+[[syscalls]]
+number = 1
+name = "sys_write"
+args = 3
+
+[[syscalls]]
+number = 2
+name = "sys_exit"
+args = 1

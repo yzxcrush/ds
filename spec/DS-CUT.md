@@ -188,6 +188,8 @@ fn context_switch(old: *u32, new: *u32) {
 
 ## 9. 实现状态（v0.1 原型）
 
-- `cut/cutc.py`：词法/语法/层检查/语义检查/Thumb 代码生成；支持 Cut 16 token、@asm、@static、@irq、纯汇编函数、if/while/for。
-- 测试：`cut/tests/test_cut.py`；示例：`cut/examples/`。
-- 未实现：AArch64 后端、UF2 生成、链接脚本自动调用、完整寄存器分配、浮点、结构体（本就不允许）。
+- `cut/cutc.py`：词法/语法/层检查/语义检查/Thumb 与 AArch64（纯 @asm 函数）代码生成；支持 Cut 16 token、@asm、@static、@irq、纯汇编函数、if/while/for。
+- `cut/uf2.py`：RP2350 UF2 生成（family 0xE48BFF56）；`cut/test_build.sh` 实际完成 Thumb/AArch64 汇编、链接与 UF2。
+- `dsoss/`：DSOSS 标准 manifest + 一致性检查器。
+- 测试：`cut/tests/`（18 项）、`dsoss/tests/`；示例：`cut/examples/`。
+- 未实现：AArch64 普通函数代码生成（仅纯 @asm）、寄存器分配/优化、UF2 之外的镜像格式、实机运行。

@@ -9,7 +9,10 @@ Ds/Cut 是 Ds 三层的裸机子语言：`Cut ⊂ Ds ⊂ Ds+`。
 python3 cut/cutc.py cut/examples/uart_hello.ds --cut --emit asm -o /tmp/uart.s
 python3 cut/cutc.py dsos/boot/rp2350_start.ds --cut --emit obj \
   --target thumbv8m.main-none-eabi -o /tmp/start.o
-sh cut/test_build.sh        # 生成 + clang 汇编 + ld.lld 链接冒烟
+python3 cut/cutc.py dsos/boot/zero2w_start.ds --cut --arch aarch64 --emit asm -o /tmp/zero2w.s
+python3 cut/cutc.py dsos/arch/context_switch_aarch64.ds --cut --arch aarch64 --emit asm -o /tmp/ctx64.s
+python3 cut/uf2.py dsos.bin dsos.uf2       # RP2350 UF2（family 0xE48BFF56）
+sh cut/test_build.sh        # Thumb + AArch64 汇编/链接 + UF2 冒烟
 python3 -m unittest discover -s cut/tests -v
 ```
 
@@ -102,13 +105,16 @@ unary():
 
 ## 当前原型限制
 
-- 仅 Thumb（RP2350/RP2040）；AArch64（Zero 2 W）后端待 v0.2。
+- AArch64 **只支持纯 @asm 函数**（启动/上下文切换）；普通函数代码生成待 v0.2。
+- Thumb 覆盖 RP2350/RP2040；链接脚本/编译后端按目标选择。
 - 无寄存器分配/优化；每个局部变量固定栈槽。
 - 无除法/取模代码生成（无硬件除法保证）→ 编译错误。
 - 无 UF2 生成；由链接后 `uf2conv.py` 处理。
 - `@static` 仅整数字面量地址；不支持段属性（@section 属 Ds+）。
 - 纯汇编函数不做参数搬运；调用约定由调用者保证（上下文切换用 r0/r1）。
 
-## DsOS
+## DsOS / DSOSS
 
-启动代码、上下文切换、链接脚本见 [`dsos/`](../dsos/) 与 [`docs/DSOS.md`](../docs/DSOS.md)。
+- 启动代码、上下文切换、链接脚本：`dsos/`
+- DsOS 架构（不继续实现）：`docs/DSOS.md`
+- **DSOSS 标准**（本任务新增）：`spec/DSOSS.md`、`dsoss/check_conformance.py`

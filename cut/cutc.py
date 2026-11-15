@@ -586,9 +586,13 @@ class Checker:
 # Thumb 代码生成
 # --------------------------------------------------------------------------
 class Codegen:
-    def __init__(self, prog: Program):
+    def __init__(self, prog: Program, arch: str = "thumb"):
         self.prog = prog
-        self.out: list[str] = [".syntax unified", ".thumb", ".text", ""]
+        self.arch = arch
+        if arch == "thumb":
+            self.out: list[str] = [".syntax unified", ".thumb", ".text", ""]
+        else:
+            self.out: list[str] = [".arch armv8-a", ".text", ""]
         self.statics = {i.name: i for i in prog.items if isinstance(i, Static)}
         self.functions = {i.name: i for i in prog.items if isinstance(i, Fn)}
         self.label_n = 0
@@ -613,6 +617,12 @@ class Codegen:
             self.emit(".text")
         for item in self.prog.items:
             if isinstance(item, Fn):
+                if self.arch == "aarch64":
+                    pure_asm = bool(item.body) and all(isinstance(x, AsmStmt) for x in item.body)
+                    if not pure_asm:
+                        raise CutError("E_CUT_BACKEND",
+                                       "AArch64 v0.1 仅支持纯 @asm 函数（普通函数代码生成待 v0.2）",
+                                       item.line, item.col)
                 self.fn(item)
         return "\n".join(self.out) + "\n"
 
@@ -781,12 +791,14 @@ class Codegen:
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
-def compile_source(src: str, filename: str, mode: str) -> str:
+def compile_source(src: str, filename: str, mode: str, arch: str = "thumb") -> str:
+    if arch not in ("thumb", "aarch64"):
+        raise CutError("E_CUT_BACKEND", f"未知架构 {arch}")
     toks = lex(src, filename)
     check_layer(toks, mode, filename)
     prog = Parser(toks, filename).program()
     Checker(filename).check(prog)
-    return Codegen(prog).gen()
+    return Codegen(prog, arch=arch).gen()
 
 
 def main(argv=None) -> int:
@@ -797,13 +809,18 @@ def main(argv=None) -> int:
     ap.add_argument("--plus", action="store_const", const="plus", dest="mode")
     ap.add_argument("--emit", choices=["asm", "obj"], default="asm")
     ap.add_argument("-o", "--output")
+    ap.add_argument("--arch", choices=["auto", "thumb", "aarch64"], default="auto",
+                    help="目标架构；默认按 --target 推断")
     ap.add_argument("--target", default="thumbv8m.main-none-eabi")
     args = ap.parse_args(argv)
     mode = args.mode or "app"
+    arch = args.arch
+    if arch == "auto":
+        arch = "aarch64" if args.target.startswith("aarch64") else "thumb"
     path = pathlib.Path(args.file)
     try:
         src = path.read_text(encoding="utf-8")
-        asm = compile_source(src, str(path), mode)
+        asm = compile_source(src, str(path), mode, arch=arch)
     except CutError as exc:
         print(str(exc), file=sys.stderr)
         return 1

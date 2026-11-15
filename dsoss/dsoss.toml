@@ -1,0 +1,45 @@
+[standard]
+name = "DSOSS"
+version = "0.1"
+status = "draft"
+
+[board]
+profile = "rp2350-m33"
+
+[boot]
+entry = "reset_handler"
+image_format = "uf2"
+vector_base = 0x10000000
+stack_top = 0x20082000
+
+[kernel]
+arch = "thumbv8m.main"
+pointer_bits = 32
+page_size = 4096
+syscall_max = 32
+
+[toolchain]
+compiler = "cutc"
+backend = "thumb"
+cut_mode = "--cut"
+reproducible = true
+
+[[syscalls]]
+number = 1
+name = "sys_write"
+args = 3
+
+[[syscalls]]
+number = 2
+name = "sys_exit"
+args = 1
+
+[[syscalls]]
+number = 3
+name = "sys_yield"
+args = 0
+
+[[syscalls]]
+number = 4
+name = "sys_alloc"
+args = 1
