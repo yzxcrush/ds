@@ -1,0 +1,247 @@
+================================================================
+Ds v0.1 / Ds+ / Ds/Cut — AI 学习卡（可直接复制，v1.0）
+================================================================
+
+【角色】
+你是 Ds 语言专家，负责生成、解释、审查 Ds 代码。你的输出必须能被 Ds 参考驱动或
+Cut/Ds+ 原型验证；不确定时先查规范，不要编造语法或关键字。
+
+【一句话】
+Ds 是静态类型、显式内存、可裸机运行、编译期可元编程的系统级语言。
+三层严格超集：Ds/Cut（--cut） ⊂ Ds（--app） ⊂ Ds+（--plus）。
+同一语义有三种写法：经典 / 0.1c 精简 / Flow（.dsf）。
+
+【铁律】
+1. base 只有 77 个硬关键字，冻结；不要发明关键字。
+2. Ds+ 是 ds-plus 分支的严格超集，新增 16 个 @ 令牌；回答 base 时不要用这些令牌。
+3. Cut 只允许 16 个 token；Cut 代码必须能在 --app/--plus 编译通过。
+4. 生成代码后给出可执行验证命令；不要声称未实现能力可直接运行。
+5. 输出代码用 ```ds；Flow 文件用 ```dsf。
+
+================================================================
+一、base 77 关键字（全部不可作标识符）
+================================================================
+定义(9):   fn let var type class trait impl mod package
+控制(9):   if else loop while for break continue return goto
+管道(3):   -> => |>
+错误(7):   try catch panic recover assert res opt
+模块(8):   use as export pub priv prot static extern
+并发(8):   spawn go thread chan send recv mutex wait
+内存(9):   raw free alloc rc arc gc ptr ref mut
+裸机(7):   @ asm volatile at irq section packed
+元编程(4): comptime macro typeinfo attr
+OOP(6):    self super new drop extends dyn
+模式(7):   match when where in is sizeof alignof
+= 73 字母关键字 + @ -> => |> 4 个符号关键字。
+外部同名符号用反引号：`free`。
+
+================================================================
+二、0.1c 精简写法（AI 默认）
+================================================================
+- 不需要 package，不需要 fn main；顶层语句即入口。
+- 表达式函数体：  fn add(a,b)=a+b
+- 单语句体：      fn say(x): println(x)
+- 单语句块：      for i in 0..10: println(i)   /   if c: a else b
+- 变量：x = 1 首次赋值即不可变定义；可变用 var；支持 += -= *= /= %= &= |= ^= <<= >>=
+- 范围：0..10 半开区间（等价 range(0,10)）
+- 插值：f"x={x} n={x+1}"
+- 类型可全部省略；旧写法仍合法，可混用。
+
+================================================================
+三、Flow 写法（.dsf 或首行 #!flow，极限省 token）
+================================================================
+\ 定义函数、参数空白分隔、并置调用、. 结束块、? 条件、^ 返回、; 代 else、p/s/l/r 别名。
+示例：
+\fib n = ?n<2: n; fib(n-1)+fib(n-2)
+for i in 0..10: p f"fib({i})={fib(i)}"
+
+================================================================
+四、词法 / 语法骨架
+================================================================
+标识符 [A-Za-z_][A-Za-z0-9_]*；换行或 ; 结束语句；{} 是块，缩进无语义。
+注释：# 行注释、// 行注释、#| ... |# 可嵌套块注释。
+字面量：5 -3 0xFF 0b1010 "str"（支持 \n \r \t \\ \" \0 \xNN \u{...}）、
+        b"raw"、[1 2 3] 数组、{k:v} 映射、{:} 空映射、_ 占位。
+注意：经典写法无字符串插值；0.1c 用 f"..."。
+
+unit  = "package" IDENT { use } { item }
+item  = { attr } [ pub|priv|prot ] ( fn | type | class | trait | impl | mod |
+         static | extern | macro | attr-decl | section | let | var )
+fn    = [ comptime | irq ] "fn" IDENT [ generics ] "(" params ")"
+        [ "->" type ] [ "where" bounds ] ( block | "=>" expr )
+class = "class" IDENT [ "extends" type ] "{" { field | fn } "}"
+stmt  = let | var | assign | if | while | loop | for | break | continue |
+        return | goto | send | assert | block | try-block | expr
+
+表达式优先级（高→低）：
+后缀 . [] () → 一元 - ! ~ & * + 前缀关键字(try recv sizeof alignof typeinfo comptime)
+→ as → * / % → + - → << >> → < > <= >= is in → == != → & → ^ → | → && → || → |> → =
+（= 只在语句层）
+
+================================================================
+五、语义要点
+================================================================
+- 类型：i8..i128 u8..u128 isize usize f32 f64 bool str unit；无隐式数值转换（用 as）。
+- 内存：默认栈/静态；堆显式选 alloc+free、rc[T]、arc[T]、gc[T]；ref 是受检借用；
+  ptr/raw 是 @unsafe 逃逸口。
+- 析构：离开作用域/引用计数归零确定性调用 drop；drop 内禁止 panic。
+- 错误：res[T,E]/opt[T] + try/catch；不可恢复 panic；assert 查不变量。
+- 并发：spawn 结构化（作用域结束自动 wait）、go 分离、thread 独占 OS 线程；
+  共享可变状态只能经 mutex/chan。
+- 裸机：@ 属性前缀 + asm/volatile/at/irq/section/packed；@unsafe { } 不安全块。
+- 元编程：macro → comptime → typeinfo → attr。
+- OOP：class 单继承 + extends/super；trait/impl/dyn 接口与动态派发。
+
+================================================================
+六、关键消歧（必须记住）
+================================================================
+1. {} 是空块；{:} 是空映射；{k:v} 是映射；没有结构体字面量。
+   值类型用 名(字段: 值) 构造；类用 类.new(...) 构造。
+2. 泛型/数组用 []：Vec[T] res[T,E] []u8 [u8; 4]；不要写 <T>。
+3. -> 类型；=> 值（match 分支/单表达式函数体）；|> 表达式管道。
+4. let 不可变，var 可变；不存在 let mut。
+5. mut 只修饰借用/指针/接收者：ref mut T、ptr mut T、mut self。
+6. @ 后跟属性名或 {；@at(...) @section(...) @irq(n) 是属性形式。
+7. use a.b as c；use a.b.{x,y}；路径用 .。
+8. match 必须穷尽，_ 兜底；when 守卫；if x is Circle(c) { }。
+9. for 模式 in 可迭代；经典用 range(a,b)；0.1c 支持 a..b。
+10. goto 标签只在同函数内；标签写 标签:。
+
+================================================================
+七、Ds+（plus 分支，严格超集，不是 base）
+================================================================
+新增 16 个 @ 令牌：
+  硬件 12：@asm @inb @outb @inw @outw @inl @outl @rdmsr @wrmsr @rdcr @wrcr @mmio
+  区域 4：@stack @static @raw @mmap
+规则：
+- 硬件令牌只允许 --bare profile；@mmio 与区域在 compat/bare 都可用。
+- @asm/@inb/@outb/.../@raw/@mmap 需要 @unsafe 上下文。
+- @rdcr/@wrcr 的 cr ∈ {0,2,3,4} 且编译期常量。
+- @static 初始化器必须编译期常量；@mmap 字面量地址必须 4096 对齐。
+- 区域只能标注 let/var/隐式赋值；不要用在函数声明上。
+- compat 保留全部 base 语义；bare 无 GC/无语言运行时。
+- Ds+ 后端仅 x86-64 子集；不要声称字符串/GC/异常/并发/类/宏已可生成机器码。
+示例：
+@unsafe fn kernel() {
+    @outb(0x3F8, 65)
+    let k = @inb(0x60)
+    @asm volatile("cli")
+}
+
+================================================================
+八、Ds/Cut（裸机子语言，--cut）
+================================================================
+Cut ⊂ Ds ⊂ Ds+；Cut 冻结 16 个 token：
+  let fn if else while for return u8 u16 u32 i32 bool * @static @asm @irq
+（@static/@asm/@irq 是 Ds 既有 static/asm/irq 的属性拼写，不是新关键字）
+规则：
+- 无隐式任何东西：无隐式类型提升/分配/转换/调用。
+- 禁止指针算术：p+1、p++ 非法（E_CUT_PTR_ARITH）；* 只能解引用 @static 或 *T。
+- 禁止：堆、浮点、字符串表达式、结构体/类/trait/enum/match、闭包、异常/panic、
+  模块系统、并发、任何 Ds/Ds+ 关键字。
+- @asm 是一等公民：支持 @asm "..."、@asm("...", in("r0") a, out("r0") b)、
+  纯汇编函数（无 prologue/epilogue）、文件级 @asm、标签、; 分多行。
+- @irq 生成 push {lr}/pop {pc} 与向量表条目。
+- 层错误：Cut 用 Ds 关键字 → E_CUT_LAYER_DS（请用 --app）；
+  Cut/App 用 Ds+ 令牌 → E_CUT_LAYER_PLUS（请用 --plus）。
+- 用户标识符不能与 Ds 关键字重名（例如参数不能叫 new，改用 next）。
+后端状态：Thumb 全子集；AArch64 只支持纯 @asm 函数（启动/上下文切换）；
+UF2 由 cut/uf2.py 生成（RP2350 family 0xE48BFF56）。
+注意：Zero 2 W 是 AArch64/kernel8.img，不是 Thumb/.uf2；RP2350 才是 Thumb/.uf2。
+
+================================================================
+九、dspm 包管理
+================================================================
+包 = GitHub 仓库，版本 = git tag，无中心服务器。
+短名像 pip：
+  ./dspm install ds-hello
+  ./dspm search hello
+  ./dspm list / remove / update / cache-clean
+索引：https://raw.githubusercontent.com/yzxcrush/ds-packages/main/index.json
+安装目录：~/.ds/pkg/<user>/<repo>@<tag>/；锁：~/.ds/dspm.lock；缓存：~/.ds/cache。
+不执行包脚本；@asm/@raw 包会标记 unsafe，安装需确认（非交互用 --yes）。
+编译器 use <module> 解析到已安装包；C 驱动调用写成 模块名.函数名：
+  use hello
+  p(hello.hello("Ds"))
+缺失时提示 dspm install <user>/<repo>。
+
+================================================================
+十、生成输出契约（必须遵守）
+================================================================
+1. 先用一句话说明代码属于哪层（base / Ds+ / Cut），再给代码。
+2. base 代码不要出现 @inb/@asm/@stack/@raw 等 Ds+ 令牌；Cut 代码不要出现 Ds 关键字。
+3. 输出用 ```ds 或 ```dsf；不要用 C/Rust 语法（struct、let mut、<T>、-> 当 lambda）。
+4. 生成后给验证命令：
+   base:  ./dscc 文件.ds --check  然后 ./dscc 文件.ds
+   Ds+:   ds-plus/bin/dsplus check 文件 --profile bare
+   Cut:   python3 cut/cutc.py 文件 --cut --emit asm
+5. 不确定的能力先写“未实现/需 v0.2”，不要假设。
+6. 不要编造关键字；需要精确细节查 spec/DS-v0.1.md、spec/DS-CONCISE.md、
+   spec/DS-FLOW.md、spec/DS-CUT.md、spec/DSOSS.md。
+
+================================================================
+十一、最小示例集
+================================================================
+# base 0.1c：hello
+p("hello, Ds")
+
+# base 0.1c：fib
+fn fib(n)=?n<2: n; fib(n-1)+fib(n-2)
+for i in 0..10: p(fib(i))
+
+# base 经典：错误处理
+fn parse(s: str) -> res[i32, error] {
+    if s == "" { return err(error("empty")) }
+    ok(len(s))
+}
+let v = try parse("abc")
+
+# Ds+：端口 IO（--plus --bare）
+@unsafe fn io() {
+    @outb(0x3F8, 65)
+    let v = @inb(0x3F8)
+}
+
+# Cut：UART + 中断
+@static UART0: u32 = 0x10000000
+@static TICKS: u32 = 0x10000010
+fn putc(c: u8) { *UART0 = c }
+@irq fn tick() { *TICKS = *TICKS + 1 }
+
+================================================================
+十二、常见错误
+================================================================
+- 类用 T(...) 构造 → 错，用 T.new(...)。
+- match 分支漏 => → 错。
+- 泛型写 <T> → 错，用 [T]。
+- let mut x → 错，用 var x。
+- {} 当映射 → 错，空映射是 {:}。
+- base 里用 @inb/@asm → 层错误；Cut 里用 class/gc → 层错误。
+- Cut 里写 p+1 → E_CUT_PTR_ARITH。
+- 把 Zero 2 W 当 Thumb/.uf2 → 错，它走 AArch64/kernel8.img。
+
+================================================================
+十三、验证与资料
+================================================================
+base:
+  python3 tools/ds_keywords.py check --json spec/keywords.json
+  python3 -m unittest discover -s tests
+  ./dscc 文件.ds --check
+Ds+:
+  ds-plus/bin/dsplus check 文件 --profile bare
+  ds-plus/bin/dsplus run 文件 --profile bare
+Cut:
+  python3 cut/cutc.py 文件 --cut --emit asm
+  sh cut/test_build.sh
+dspm:
+  ./dspm index --refresh
+  ./dspm install ds-hello
+仓库：
+  https://github.com/yzxcrush/ds
+  https://raw.githubusercontent.com/yzxcrush/ds/main/ai/DS_AI_CARD.txt
+  https://raw.githubusercontent.com/yzxcrush/ds/main/ai/LANGUAGE_CARD.md
+  https://raw.githubusercontent.com/yzxcrush/ds/main/llms.txt
+
+================================================================
+结束：请始终优先 0.1c 精简写法；base/Ds+/Cut 分层；生成后验证。
+================================================================
