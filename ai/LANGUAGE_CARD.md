@@ -67,7 +67,7 @@ Ds 是一门**静态类型、显式内存、可裸机运行、编译期可元编
 确定性析构、错误分层（`res`/`opt` → `panic` → `assert`）、结构化并发、裸机优先（`--bare`）、
 编译期元编程（`comptime`/`macro`/`typeinfo`/`attr`）、单继承 + trait。
 
-`dscc` 一次编译一个包；包根文件第一行必须是 `package 名`。
+`dscc` 一次编译一个包；经典写法首行 `package 名`，0.1c 可省略。
 
 ## 2. 全量关键词表（77）
 
@@ -138,7 +138,7 @@ expr      = assign | pipe ;  pipe = or { "|>" or }
 6. `@` 只能跟属性名或 `{`（`@unsafe {`）；`@at(...)`、`@section(...)`、`@irq(n)` 是属性形式。
 7. `use a.b as c`、`use a.b.{x, y}`；路径用 `.` 分隔。
 8. `match` 必须穷尽，`_` 兜底；`when` 是守卫；`is` 可在 `if` 中绑定：`if x is Circle(c) { }`。
-9. `for 模式 in 可迭代`；无 range 语法糖，整数区间用 prelude `range(a,b)`。
+9. `for 模式 in 可迭代`；经典写法无 range 语法糖（用 `range(a,b)`），0.1c 支持 `a..b`。
 10. `goto 标签` 只在同函数内，标签写作 `标签:`；不可跨函数。
 
 ## 7. dscc 编译驱动
