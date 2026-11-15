@@ -17,6 +17,8 @@
 - [为什么是 Ds（优势/对比/适用范围）](docs/WHY-DS.md)
 - [Ds+（plus 分支）一页纸](docs/DS-PLUS.md) · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
 - [dspm 包管理规范](docs/DSPM.md)
+- [Ds/Cut 裸机子语言规范](spec/DS-CUT.md) · [编译器原型](cut/README.md)
+- [DsOS 架构初稿](docs/DSOS.md) · [启动/上下文切换/链接脚本](dsos/)
 - [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
 - [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
 - [机器可读关键词表 spec/keywords.json](spec/keywords.json)
@@ -82,6 +84,13 @@ Ds+（plus 分支，非 base）：
 - 也可显式 `./dspm install <user>/<repo>[@tag]`；包 = GitHub 仓库，版本 = tag；ds.toml 含 name/version/exports/deps/targets；lock 记录 tag/commit/hash。
 - 编译器中 `use <module>` 解析到 `~/.ds/pkg`；C 驱动已原生支持，调用写成 `模块名.函数名`；缺失时提示 `dspm install <user>/<repo>`。
 - 不执行包脚本；unsafe 包（@asm/@raw）需要 --yes。
+
+三层架构：Ds/Cut（--cut，冻结 16 token 的裸机子语言）⊂ Ds（--app）⊂ Ds+（--plus）。
+- Cut 代码必须能在 --app/--plus 100% 编译；用错层报 E_CUT_LAYER_DS（请用 --app）或 E_CUT_LAYER_PLUS（请用 --plus）。
+- Cut 无隐式任何东西：禁止指针算术（p+1 非法）、无堆/浮点/字符串/结构体/异常/并发。
+- @asm 是 Cut 一等公民：字符串原样输出、in/out 约束、纯汇编函数无 prologue、文件级 @asm 写向量表。
+- DsOS：RP2350 用 Thumb/.uf2（Cortex-M33）；Zero 2 W 用 AArch64/kernel8.img（Cortex-A53，不是 UF2/Thumb）。
+- DsOS 三层：Ring -1（Cut 启动/向量/驱动）、Ring 0（Ds+ 内核）、Ring 3（Ds 用户态）。
 
 ```
 
@@ -1053,6 +1062,391 @@ p(hello.hello("Ds"))
 - Python 原型；C/Java 移植后续。
 
 
+## 2f. Ds/Cut 裸机子语言
+
+# Ds/Cut 裸机子语言规范（v0.1）
+
+> **定位**：Cut 是 Ds 三层架构的**最底层裸机子语言**，用于启动代码、异常向量、最底层驱动。
+> **铁律**：`Ds/Cut ⊂ Ds ⊂ Ds+`；Cut 代码必须能在 `--app` / `--plus` 下 100% 编译通过。
+> **独立语义锚点**：无隐式任何东西；每条指令/生命周期/调用目标编译期可知；硬件即地址。
+
+## 0. 规格冲突与修正（先读）
+
+本任务原文有 4 处与铁律/事实冲突，本规范按「不违反铁律」修正：
+
+| # | 原文 | 冲突 | 修正 |
+|---|---|---|---|
+| C1 | 标题「15 个关键字」，正文列到 16 个（含 `@irq`） | 数量自相矛盾 | 冻结 **16 个 token**：12 个标识符关键字 + `*` + `@static/@asm/@irq` 三个属性形式；若要严格 15，则删 `@irq`（不推荐） |
+| C2 | 关键字写作 `如果/对于/返回` | Ds base 使用 `if/for/return`；中文关键字会让 Cut ⊄ Ds | **规范语法用英文** `if/else/while/for/return`；中文只是文档别名，不作为词法 |
+| C3 | `@static/@asm/@irq` 是 Cut 关键字 | 它们是 Ds+ 的 `@` 令牌；直接作为新关键字会破坏 Ds 77 冻结 | 定义为 Ds 既有 `static/asm/irq` 的**属性拼写**，不是新关键字；Ds `--app` 必须接受这三种属性形式 |
+| C4 | 「Zero 2 W + ARM Thumb + .uf2」 | Zero 2 W 是 **Cortex-A53 / AArch64**，不是 Thumb/Cortex-M，也不走 .uf2 | 双后端：**RP2350（Cortex-M33）→ Thumb/.uf2**；**Zero 2 W（Cortex-A53）→ AArch64/kernel8.img**。启动/链接脚本分别提供 |
+| C5 | 「编译器内置汇编器或静态链接 LLVM-MC」 | 原型阶段自建完整汇编器成本过高 | v0.1 原型输出 `.s`，可选用系统 `clang --target=thumbv8m...` 汇编为 `.o`；自举汇编器列入路线图 |
+| C6 | Zero 2 W 需要 64 位地址/寄存器 | Cut 冻结类型只有 u8/u16/u32/i32；u64 会破坏 16 token | **Cut v0.1 只覆盖 32 位 MCU（RP2350）**；Zero 2 W 的启动/上下文切换用**纯 @asm**参考，AArch64 的类型化后端放 v0.2（或把 u64 作为 Ds+ 类型，而非 Cut 关键字） |
+
+## 1. 三层模式与层错误
+
+| 模式 | 允许 | 拒绝 |
+|---|---|---|
+| `--cut` | Cut 16 token；Cut 子集语法 | 任何 Ds 关键字（`class/trait/match/gc/...`）→ `E_CUT_LAYER_DS`；任何 Ds+ `@raw/@mmap/@inb...` → `E_CUT_LAYER_PLUS` |
+| `--app`（默认） | Cut 全部 + Ds base 77 关键字 | Ds+ `@` 令牌 → `E_CUT_LAYER_PLUS`（提示 `--plus`） |
+| `--plus` | Cut + Ds + Ds+ | 无层错误；后端未实现的能力报 `E_CUT_UNSUPPORTED` |
+
+错误格式（必须精确到行/列）：
+
+```text
+file.ds:12:5: error[E_CUT_LAYER_DS]: `class` 属于 Ds 层，请使用 --app 模式
+file.ds:20:1: error[E_CUT_LAYER_PLUS]: `@raw` 属于 Ds+ 层，请使用 --plus 模式
+```
+
+## 2. 16 个冻结 token（语义 + 防换皮理由）
+
+> 12 个标识符 + `*` + 3 个属性形式。`u8/u16/u32/i32/bool` 在 Ds 中是 prelude 类型，不是硬关键字。
+
+| # | token | 一句话语义 | 防换皮理由（Ds 独有） |
+|---|---|---|---|
+| 1 | `let` | 栈上绑定，类型可推导或显式；无 move/copy 语义 | 值只有“栈槽 + 生命周期”，没有移动语义/析构歧义；汇编级就是一个 sp 偏移 |
+| 2 | `fn` | 平面函数：无重载、无泛型、无虚表 | 每次调用目标在编译期唯一确定，生成直接 `bl`，不存在动态派发/单态化爆炸 |
+| 3 | `if` | 条件分支，可跟 `else` | 条件必须是 `bool`；无隐式真值转换，分支在 IR 上就是比较+跳转 |
+| 4 | `else` | if 的否定分支 | 与 if 同一跳转结构，不引入表达式二义性 |
+| 5 | `while` | 条件循环 | 无迭代器/闭包/隐式分配；循环变量与退出条件显式，栈帧大小编译期固定 |
+| 6 | `for` | 计数循环 `for i in start..end` | 只接受整数区间，编译为“初始化/比较/递增/跳转”四段，不生成迭代器对象 |
+| 7 | `return` | 函数返回 | 单入口单出口可静态分析；无析构/异常展开，返回即 `bx lr` |
+| 8 | `u8` | 8 位无符号整数 | 位宽=寄存器/内存宽度，无隐式提升；溢出行为显式（默认 wrap） |
+| 9 | `u16` | 16 位无符号整数 | 同上；硬件寄存器映射按位宽直接选中，不做装箱 |
+| 10 | `u32` | 32 位无符号整数 | 同上；地址/寄存器默认宽度，指针运算被禁止 |
+| 11 | `i32` | 32 位有符号整数 | 仍无隐式转换；与 u32 混用必须显式 `as`（Cut v0.1 仅允许同宽/拓宽） |
+| 12 | `bool` | 1 字节布尔（true/false） | 无“非零即真”；汇编层就是 0/1 比较结果 |
+| 13 | `*` | 受限解引用/指针类型 `*T`：只能解引用已知地址/`@static`/`*T` 参数；**禁止指针算术** | 不是 C 指针：`p+1`、`p++` 直接编译错误；地址只能来自 `@static` 或硬件调用，编译器可枚举所有访存 |
+| 14 | `@static` | `@static NAME: T = 地址常量`：把符号绑定到固定物理地址；`*NAME` 读写该地址；汇编层 `.equ NAME, ADDR` | 不是 C `static` 存储类：它产生的是**地址符号**；没有全局变量初始化/段放置的隐式行为 |
+| 15 | `@asm` | 内联汇编块/纯汇编函数/文件级汇编；原样写入 `.s` | 一等公民，不是逃生舱；DSL 的调度/启动/上下文切换都直接写，不依赖外部 `.S` |
+| 16 | `@irq` | 标记中断函数：自动现场保护 + 生成向量表条目 | 中断语义是语言级：编译器知道这是异常入口，生成 `push {lr}`/`pop {pc}`，不是普通函数加属性 |
+
+### 2.1 标识符约束
+
+Cut 代码里的用户标识符**不能与 Ds 关键字重名**（因为 Cut ⊂ Ds，Ds 会把它当关键字）。
+例如上下文切换参数不能叫 `new`（Ds 的 `new` 关键字），请用 `next`；`in` 只作为 `for ... in` 的结构词。
+
+### 2.2 中文别名（仅文档，不是词法）
+
+`如果→if`、`否则→else`、`循环→while`、`对于→for`、`返回→return`、`函数→fn`。
+**代码里必须写英文**，否则 Cut ⊄ Ds。
+
+## 3. 语法
+
+```ebnf
+program      = { global_asm | static_decl | irq_attr? fn_decl } ;
+global_asm   = "@asm" string [ ";" ] ;
+static_decl  = "@static" IDENT ":" type "=" const_expr ";" ;
+irq_attr     = "@irq" [ "(" INT ")" ] ;
+fn_decl      = irq_attr? "fn" IDENT "(" [ param { "," param } ] ")"
+               [ "->" type ] block ;
+param        = IDENT ":" type ;
+type         = "u8" | "u16" | "u32" | "i32" | "bool" | "*" type ;
+block        = "{" { stmt } "}" ;
+stmt         = let | assign | if | while | for | return | asm_stmt | expr_stmt ;
+let          = "let" IDENT [ ":" type ] "=" expr ";" ;
+assign       = lvalue "=" expr ";" ;
+lvalue       = IDENT | "*" expr ;
+if           = "if" expr block [ "else" ( block | if ) ] ;
+while        = "while" expr block ;
+for          = "for" IDENT "in" expr ".." expr block ;
+return       = "return" [ expr ] ";" ;
+asm_stmt     = "@asm" string asm_args? [ ";" ] ;
+asm_args     = [ "," "in" "(" REG ")" expr ]* [ "," "out" "(" REG ")" IDENT ]* ;
+expr         = logic ;  (* + - * / % & | ^ << >> == != < > <= >= && || ! ~ 一元 - 调用 解引用 *)
+```
+
+**禁止**（编译器必须拒绝，错误码 `E_CUT_FORBIDDEN`）：
+堆分配、浮点、struct/class/trait/enum/match、闭包/lambda、异常/panic、字符串表达式（仅 @asm 字符串）、模块系统、并发、指针算术、任何 Ds/Ds+ 关键字、浮点字面量、全局可变变量（`@static` 是地址符号，不是存储）。
+
+## 4. @asm 完整语法（一等公民）
+
+### 4.1 语句级
+```ds
+@asm "adds r0, r0, #1"
+@asm("add r0, r0, r1", in("r0") a, in("r1") b, out("r0") r)
+@asm "loop:"; @asm "adds r0, r0, #1"; @asm "b loop"
+```
+- 字符串原样写入 `.s`；编译器**不校验汇编语法**，由汇编器报错。
+- 分号分隔多条；标签 `name:` 可定义/跳转。
+- `in("rN") expr`：先把 expr 求值到指定寄存器；`out("rN") var`：汇编后把该寄存器写回变量。
+- 可引用 Ds/Cut 符号：函数名、`@static` 地址、全局汇编标签。
+
+### 4.2 纯汇编函数
+整个函数体只有 `@asm` 语句时，**不生成 prologue/epilogue**，原样输出：
+
+```ds
+fn context_switch(old: *u32, new: *u32) {
+    @asm "push {r4-r11, lr}"
+    @asm "str sp, [r0]"
+    @asm "ldr sp, [r1]"
+    @asm "pop {r4-r11, pc}"
+}
+```
+
+### 4.3 文件级汇编
+函数外的 `@asm` 直接写入输出（用于启动/向量表/段声明）：
+
+```ds
+@asm ".section .vector_table,\"a\",%progbits"
+@asm ".word 0x20040000"
+@asm ".word reset_handler"
+```
+
+### 4.4 中断函数
+```ds
+@irq fn timer_irq() {
+    *TICKS = *TICKS + 1;
+}
+```
+编译器生成：`push {lr}` ... `pop {pc}`；在 `.vector_table` 中按声明顺序生成 `.word timer_irq`（可用 `--irq-vector-base` 指定编号；v0.2 支持显式 `@irq(n)`）。
+
+## 5. 编译管线 / ABI / 栈帧
+
+```text
+源码 → 词法 → 语法 → AST → 层检查 → 语义检查 → 线性 IR → ARM Thumb 汇编 → clang/llvm-mc → .o → ld.lld → ELF → objcopy/UF2
+```
+
+- **层检查先于语法**：错误的层关键字必须报 `E_CUT_LAYER_*`，而不是“未知语法”。
+- **栈帧表**：每个局部变量编译期分配固定 `sp` 偏移；函数帧大小 = 槽数×4 向上对齐 8。
+- **AAPCS**：前 4 参数 r0–r3，返回值 r0；调用者保存 r0–r3/r12，被调者保存 r4–r11。
+- **中断**：`push {lr}` / `pop {pc}`；不生成普通函数返回。
+- **输出**：`.s` 文本；`--emit obj` 用 `clang --target=thumbv8m.main-none-eabi -c`（RP2350）或 `thumbv6m-none-eabi`（RP2040）。
+
+## 6. Thumb 指令映射表（原型子集）
+
+| Cut 构造 | Thumb 汇编 |
+|---|---|
+| `let x = N` | `movs r0, #N` / `ldr r0, =N`；`str r0, [sp,#off]` |
+| `let p: *T = @static 地址` | `ldr r0, =ADDR`；存指针值 |
+| `*p` | `ldr r0, [r0]` |
+| `*p = e` | 求值 e → r0；求值 p → r1；`str r0, [r1]` |
+| `a + b` | 求 a→r0，push；求 b→r0；pop r1；`adds r0, r1, r0` |
+| `a - b` | `subs r0, r1, r0` |
+| `a * b` | `muls r0, r1, r0` |
+| `& \| ^ << >>` | `ands/ orrs/ eors/ lsls/ asrs` |
+| `== != < > <= >=` | `cmp r1, r0`；`ite` 或 `movs r0,#0; ...`（原型用 `ite` 组合） |
+| `&& \|\|` | 分支短路或 `ands/orrs`（原型非短路） |
+| `if` | `cmp`/`beq`/`bne` + 标签 |
+| `while` | 标签 + 条件跳转 + `b` |
+| `for i in a..b` | i=a；`cmp i,b`；`bhs end`；body；`adds i,#1`；`b loop` |
+| 调用 `f(a,b)` | 参数入 r0–r3；`bl f` |
+| `@static N: *T = A` | `.equ N, A`；取地址 `ldr r0, =N` |
+| `@irq fn` | `push {lr}` ... `pop {pc}`；`.word fn` |
+| 纯 `@asm` 函数 | 原样输出，无 prologue/epilogue |
+| `@asm "..."` | 原样输出（`;` 分隔多行） |
+
+## 7. 防换皮验证（必须通过）
+
+1. **指针算术**：`p + 1` / `p++` 必须 `E_CUT_PTR_ARITH`；C 指针可直接算术 → Cut 额外禁止，语义不同。
+2. **无隐式转换**：`u8 + u32` 必须显式 `as`（Cut v0.1 仅允许 same-width 或 widen）；C 会隐式提升。
+3. **无隐式分配/调用**：没有堆、没有虚表、没有闭包；每个 `bl` 目标编译期唯一。
+4. **`@static` 不是 C static**：它只产生地址符号；不分配存储、不初始化段。
+5. **`@asm` 不是逃生舱**：语言级启动/调度/上下文切换都用它，且可引用语言符号。
+6. **C/Rust 翻译测试**：把一段 Cut 逐行翻译到 C/Rust，若 C/Rust 需要额外机制（禁止指针算术的检查、地址符号 `.equ`、纯汇编函数无 prologue、@irq 向量生成）才能等价 → Cut 不是换皮。
+
+## 8. DsOS 中的层映射
+
+- **Ring -1（Cut）**：启动、异常向量、GPIO/UART/定时器最底层。
+- **Ring 0（Ds+）**：PMM/VMM/调度/中断分发/syscall/驱动框架。
+- **Ring 3（Ds）**：用户程序，无 `@` 硬件关键字。
+- 编译器层强制：`--cut` 只能 Ring -1；`--app` 不能写 `@raw/@mmap/@inb`；`--plus` 才可写内核。
+
+## 9. 实现状态（v0.1 原型）
+
+- `cut/cutc.py`：词法/语法/层检查/语义检查/Thumb 代码生成；支持 Cut 16 token、@asm、@static、@irq、纯汇编函数、if/while/for。
+- 测试：`cut/tests/test_cut.py`；示例：`cut/examples/`。
+- 未实现：AArch64 后端、UF2 生成、链接脚本自动调用、完整寄存器分配、浮点、结构体（本就不允许）。
+
+
+## 2g. DsOS 架构初稿
+
+# DsOS 架构初稿（v0.1）
+
+> **定位**：用 Ds+ 编写的实验性 OS 内核，验证 Ds+ 硬件关键字能否覆盖“启动 → 中断 → 调度 → 用户态”。
+> **状态**：架构 + 启动/上下文切换/链接脚本骨架；内核主体（PMM/VMM/调度/syscall）为路线图。
+> **不混 C**：内核 Ds+，启动/异常向量 Ds/Cut（@asm），用户程序 Ds。
+
+## 0. 先修正两个硬件事实
+
+| 任务原文 | 事实 | 本设计 |
+|---|---|---|
+| Zero 2 W（Cortex-A53）用 ARM Thumb + .uf2 | Zero 2 W 是 **AArch64**，由 GPU 固件加载 `kernel8.img` 到 `0x80000`，**不用 UF2** | Zero 2 W 走 **AArch64 后端 + ELF/kernel8.img** |
+| RP2350 用 ARM Thumb + .uf2 | RP2350 是 Cortex-M33（ARMv8-M），Thumb-2 + UF2 正确 | RP2350 走 **Thumb 后端 + ELF → UF2** |
+
+因此 DsOS 是**双 BSP/双后端**：`thumbv8m.main`（RP2350）与 `aarch64`（Zero 2 W）。
+`cut/cutc.py` 当前只实现 Thumb；AArch64 后端是 v0.2 路线图（启动代码已给出参考实现）。
+
+## 1. 三层权限映射
+
+| Ring | 语言层 | 模式 | 写什么 |
+|---|---|---|---|
+| Ring -1 | Ds/Cut | `--cut` | 启动代码、异常向量、GPIO/UART/定时器最底层、上下文切换 |
+| Ring 0 | Ds+ | `--plus` | PMM/VMM、调度、中断分发、syscall、驱动框架 |
+| Ring 3 | Ds | `--app` | 用户程序；没有 `@` 硬件关键字 |
+
+编译器强制：
+- `--app` 不能写 `@raw/@mmap/@inb...` → `E_CUT_LAYER_PLUS`；
+- `--cut` 不能写 Ds 关键字（`class/gc/match/...`）→ `E_CUT_LAYER_DS`；
+- 内核代码不能悄悄跑在用户层（层检查先于语法）。
+
+## 2. 目标板与内存地图
+
+### Zero 2 W（BCM2710A1，Cortex-A53 ×4，512MB）
+
+```text
+0x00000000 - 0x00080000   固件/ATAGS 保留
+0x00080000 - 0x00200000   内核镜像 + 异常向量 + .text/.rodata
+0x00200000 - 0x00400000   页表（L1/L2/L3，@mmap）
+0x00400000 - 0x08000000   内核堆（@raw 管理，约 124MB）
+0x08000000 - 0x20000000   用户进程空间（每进程 16MB 起）
+0x20000000 - 0x3F000000   外设寄存器（UART/GPIO/定时器/GIC）
+```
+
+### RP2350（Cortex-M33，264KB SRAM）
+
+```text
+0x10000000 - 0x10400000   XIP Flash（内核 .text/.rodata，向量表在 0x10000000）
+0x20000000 - 0x20040000   SRAM（.data/.bss/栈/堆；最坏 256KB）
+0x40000000+               APB 外设（UART/GPIO/TIMER）
+0xE0000000+               Cortex-M 系统控制（VTOR/NVIC/SysTick）
+```
+
+UF2：`objcopy -O binary` → `uf2conv.py`（RP2350 的 family id 0xE48BFF56）。
+Zero 2 W：`kernel8.img` 直接由固件加载，不用 UF2。
+
+## 3. 启动流程
+
+### RP2350（Thumb）
+1. Boot ROM 从 Flash 0x10000000 取向量表；
+2. 栈顶 = 0x20082000；`reset_handler`：
+   - 设置 VTOR = 0x10000000；
+   - 从 Flash 复制 `.data` 到 SRAM；
+   - 清零 `.bss`；
+   - 初始化 UART/时钟/定时器；
+   - `bl main` → 调度器。
+3. `@irq` 函数生成向量表条目；`@asm` 负责上下文切换。
+
+### Zero 2 W（AArch64）
+1. GPU 固件加载 `kernel8.img` 到 0x80000；
+2. `_start`（EL2 或 EL1，MMU off）：
+   - 设置栈到 0x00200000；
+   - 清零 `.bss`；
+   - 设置 `VBAR_EL1` 到异常向量；
+   - 初始化 UART（0x3F201000）；
+   - 初始化 GIC/定时器；
+   - `bl kernel_main`。
+3. 异常向量使用 16 项 AArch64 向量表；`@irq` 在 Ds+ 层绑定。
+
+## 4. 调度与并发
+
+- 每线程一个 `@stack` 标记的内核栈/用户栈（`@stack` 在 Ds+ 层）；
+- 上下文切换用 `@asm` 纯汇编函数（见 `dsos/arch/`）；
+- 时间片由定时器中断（`@irq`）触发；
+- 线程间通信：ring buffer + 自旋锁（v0.1 单核；SMP 后加原子/内存屏障）。
+
+```ds
+# 内核伪代码（Ds+）
+@irq fn timer_irq() {
+    ticks = ticks + 1
+    schedule()
+}
+```
+
+## 5. syscall 接口
+
+用户态 Ds：
+
+```ds
+sys_write(1, "hello", 5)
+```
+
+编译器按目标生成：
+- RP2350：`svc #0`（SVC 异常），内核 SVC handler 分发；
+- Zero 2 W：`svc #0`（AArch64），异常向量 `VBAR_EL1 + 0x400` 分发。
+
+syscall 表（v0.1）：
+
+| 号 | 名称 | 参数 | 返回 |
+|---|---|---|---|
+| 1 | `sys_write` | fd, ptr, len | 写入字节数 |
+| 2 | `sys_exit` | code | 不返回 |
+| 3 | `sys_yield` | - | 0 |
+| 4 | `sys_alloc` | pages | 虚拟地址 |
+
+用户态不能直接 `@raw/@mmap/@asm`；只能 `sys_*`。
+
+## 6. 文件结构
+
+```text
+DS-OS/
+├── cut/                     # Ds/Cut 编译器 + 启动代码
+├── dsos/
+│   ├── boot/
+│   │   ├── rp2350_start.ds   # Thumb 启动/向量（可编译）
+│   │   └── zero2w_start.ds   # AArch64 启动（参考，AArch64 后端待实现）
+│   ├── arch/
+│   │   ├── context_switch_thumb.ds
+│   │   └── context_switch_aarch64.ds
+│   ├── bsp/
+│   │   ├── rp2350.ld
+│   │   └── zero2w.ld
+│   ├── kernel/                # Ds+ 内核（路线图）
+│   │   ├── main.ds+
+│   │   ├── mm/pmm.ds+  mm/vmm.ds+
+│   │   ├── sched/sched.ds+
+│   │   ├── irq/handler.ds+
+│   │   ├── drivers/uart.ds+
+│   │   └── syscall.ds+
+│   └── ds.toml
+├── spec/DS-CUT.md
+└── docs/DSOS.md
+```
+
+## 7. Ds+ 关键字在 DsOS 的用法
+
+| 关键字 | 用途 | 层 |
+|---|---|---|
+| `@asm` | 启动、上下文切换、SVC 入口 | Cut/Ds+ |
+| `@static` | 固定地址符号（UART/GPIO/VTOR） | Cut/Ds+ |
+| `@irq` | 中断/SVC 入口，生成向量表 | Cut/Ds+ |
+| `@raw` | 物理页帧、DMA 缓冲 | Ds+ |
+| `@mmap` | 页表映射 | Ds+ |
+| `@stack` | 内核栈/用户栈指定地址 | Ds+ |
+| `@entry` | `_start` / syscall 入口（路线图） | Ds+ |
+| `@section` | 段放置（向量表 0x10000000） | Ds+ |
+| `@volatile` | 设备寄存器读写不优化 | Ds+ |
+| `@packed` | 页表项/描述符紧凑布局 | Ds+ |
+
+> 注：`@static/@asm/@irq` 在 Ds/Cut 中是既有 `static/asm/irq` 的属性拼写，不新增关键字；
+> `@raw/@mmap/...` 才是 Ds+ 新令牌。这样满足 Cut ⊂ Ds ⊂ Ds+。
+
+## 8. 防换皮验证（DSOS 视角）
+
+1. 启动代码没有 C 的 `crt0`/链接脚本约定：`@asm` 直接写向量表 + `.equ` 地址符号，C 需要额外汇编/链接脚本才能等价；
+2. 上下文切换是纯 `@asm` 函数，无 prologue/epilogue，C 需要内联汇编或外部 `.S`；
+3. 中断函数由 `@irq` 生成 `push {lr}`/`pop {pc}` 和向量表条目，C 需要 `__attribute__((interrupt))` + 启动文件；
+4. 用户态没有 `@` 令牌，内核对 `@raw/@mmap` 的独占由编译器层强制，C 无语言级 Ring 隔离；
+5. `@static` 不是 C static：它只绑定地址符号，不分配存储。
+
+## 9. 路线图
+
+- M0：Cut 编译器 Thumb 子集（本仓库 v0.1 原型） ✅
+- M1：RP2350 启动 → 串口输出 → 死循环（`boot/rp2350` + UART）
+- M2：PMM/VMM（Ds+ `@raw/@mmap`）→ 页表 → 用户态
+- M3：@irq 定时器 + 上下文切换 + 轮转调度
+- M4：syscall + 用户程序 + DsOS shell
+- M5：Zero 2 W AArch64 后端 + 多核启动
+- M6：移植到 Pico 2 / Zero 2 W 实机
+
+## 10. 风险与未决
+
+- AArch64 后端、UF2/family id、GPU 固件启动细节未实现；
+- Ds+ 的 `@mmap/@raw/@stack/@entry/@section/@volatile/@packed` 在现有 Ds+ 原型中尚未全部落地（P0–P6 已实现 16 令牌，其中不含 @entry/@section/@volatile/@packed 的新拼写，需要 v0.2 扩展）；
+- 中断现场保护/浮点/多核缓存一致性未做；
+- 无 MMU 的 RP2350 与有 MMU 的 Zero 2 W 需要两套内存管理路径。
+
+
 ## 2c. Language Card
 
 # Ds v0.1 Language Card
@@ -1106,6 +1500,14 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 编译器 `use <module>` 解析到已安装包；C 驱动已原生支持，调用写成 `模块名.函数名`。
 
 详见 `docs/DS-PLUS.md`、`docs/DSPM.md`。
+
+## 0d. Ds/Cut 与 DsOS（裸机子语言）
+
+- Cut ⊂ Ds ⊂ Ds+；`--cut` / `--app` / `--plus` 三模式，用错层给 `E_CUT_LAYER_DS` / `E_CUT_LAYER_PLUS`。
+- Cut 冻结 16 token：`let fn if else while for return u8 u16 u32 i32 bool * @static @asm @irq`（中文别名仅文档）。
+- 禁指针算术、堆、浮点、字符串表达式、结构体/闭包/异常/并发；`@asm` 支持 `in("r0")/out("r0")`、纯汇编函数、文件级汇编。
+- DsOS：RP2350 → Thumb/.uf2；Zero 2 W → AArch64/kernel8.img（不是 UF2）。
+- 详见 `spec/DS-CUT.md`、`docs/DSOS.md`。
 
 ## 1. 定位
 

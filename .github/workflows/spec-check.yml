@@ -24,6 +24,10 @@ jobs:
         run: |
           python3 -m unittest tests.test_dspm -v
           ./dspm --version
+      - name: Ds/Cut 原型与构建冒烟
+        run: |
+          python3 -m unittest discover -s cut/tests -v
+          sh cut/test_build.sh
       - name: 终端驱动冒烟
         run: |
           ./dscc examples/tour.ds | head -5

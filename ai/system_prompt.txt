@@ -23,3 +23,10 @@ Ds+（plus 分支，非 base）：
 - 也可显式 `./dspm install <user>/<repo>[@tag]`；包 = GitHub 仓库，版本 = tag；ds.toml 含 name/version/exports/deps/targets；lock 记录 tag/commit/hash。
 - 编译器中 `use <module>` 解析到 `~/.ds/pkg`；C 驱动已原生支持，调用写成 `模块名.函数名`；缺失时提示 `dspm install <user>/<repo>`。
 - 不执行包脚本；unsafe 包（@asm/@raw）需要 --yes。
+
+三层架构：Ds/Cut（--cut，冻结 16 token 的裸机子语言）⊂ Ds（--app）⊂ Ds+（--plus）。
+- Cut 代码必须能在 --app/--plus 100% 编译；用错层报 E_CUT_LAYER_DS（请用 --app）或 E_CUT_LAYER_PLUS（请用 --plus）。
+- Cut 无隐式任何东西：禁止指针算术（p+1 非法）、无堆/浮点/字符串/结构体/异常/并发。
+- @asm 是 Cut 一等公民：字符串原样输出、in/out 约束、纯汇编函数无 prologue、文件级 @asm 写向量表。
+- DsOS：RP2350 用 Thumb/.uf2（Cortex-M33）；Zero 2 W 用 AArch64/kernel8.img（Cortex-A53，不是 UF2/Thumb）。
+- DsOS 三层：Ring -1（Cut 启动/向量/驱动）、Ring 0（Ds+ 内核）、Ring 3（Ds 用户态）。

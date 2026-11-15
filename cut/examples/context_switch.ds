@@ -1,0 +1,10 @@
+# Ds/Cut：纯汇编上下文切换（Thumb-2，AAPCS r0=old r1=next）
+# push {r4-r11, lr} 需要 ARMv7-M+（RP2350）；RP2040 需拆分保存 r8-r11。
+fn context_switch(old: *u32, next: *u32) {
+    @asm "push {r4-r11, lr}"
+    @asm "mov r2, sp"
+    @asm "str r2, [r0]"
+    @asm "ldr r2, [r1]"
+    @asm "mov sp, r2"
+    @asm "pop {r4-r11, pc}"
+}

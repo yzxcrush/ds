@@ -36,6 +36,8 @@ def build() -> str:
     why = read("docs/WHY-DS.md")
     plus = read("docs/DS-PLUS.md")
     dspm = read("docs/DSPM.md")
+    cut = read("spec/DS-CUT.md")
+    dsos = read("docs/DSOS.md")
     spec = read("spec/DS-v0.1.md")
     llms = read("llms.txt")
     keywords = read("spec/keywords.json")
@@ -76,6 +78,14 @@ def build() -> str:
         "## 2e. dspm 包管理",
         "",
         dspm,
+        "",
+        "## 2f. Ds/Cut 裸机子语言",
+        "",
+        cut,
+        "",
+        "## 2g. DsOS 架构初稿",
+        "",
+        dsos,
         "",
         "## 2c. Language Card",
         "",

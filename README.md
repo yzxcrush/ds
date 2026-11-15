@@ -7,6 +7,20 @@
 
 > **定义 + 可执行参考驱动**：本仓库给出 Ds v0.1 的完整定位、词法、**77 项全量关键词表**、运算符、字面量、注释、EBNF、语义契约与 `dscc` 编译驱动定义，并附带 **Python 参考驱动**（词法器 → 解析器 → 树遍历解释器）与 `ds` / `dscc` 终端命令。**不产出机器码**，语言规范本身仍是定义稿。
 
+## Ds/Cut 裸机子语言 + DsOS
+
+三层严格超集：**Cut ⊂ Ds ⊂ Ds+**。Cut 是冻结 16 token 的裸机子语言，用于启动/异常向量/最底层驱动：
+
+```bash
+python3 cut/cutc.py dsos/boot/rp2350_start.ds --cut --emit asm -o start.s
+sh cut/test_build.sh          # clang 汇编 + ld.lld 链接冒烟
+```
+
+- 规范：[spec/DS-CUT.md](spec/DS-CUT.md) ｜ 编译器：[cut/README.md](cut/README.md)
+- DsOS 架构：[docs/DSOS.md](docs/DSOS.md) ｜ 启动/上下文切换/链接脚本：[dsos/](dsos/)
+- 双目标（已纠正原任务冲突）：**RP2350 → Thumb/.uf2**；**Zero 2 W → AArch64/kernel8.img**
+- 层错误精确提示：`--cut` 用 Ds 关键字报 `E_CUT_LAYER_DS`；`--app` 用 Ds+ `@` 令牌报 `E_CUT_LAYER_PLUS`
+
 ## 包管理 dspm（原型）
 
 包 = GitHub 仓库，版本 = git tag，源码即分发，无中心服务器：

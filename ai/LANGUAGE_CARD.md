@@ -50,6 +50,14 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 
 详见 `docs/DS-PLUS.md`、`docs/DSPM.md`。
 
+## 0d. Ds/Cut 与 DsOS（裸机子语言）
+
+- Cut ⊂ Ds ⊂ Ds+；`--cut` / `--app` / `--plus` 三模式，用错层给 `E_CUT_LAYER_DS` / `E_CUT_LAYER_PLUS`。
+- Cut 冻结 16 token：`let fn if else while for return u8 u16 u32 i32 bool * @static @asm @irq`（中文别名仅文档）。
+- 禁指针算术、堆、浮点、字符串表达式、结构体/闭包/异常/并发；`@asm` 支持 `in("r0")/out("r0")`、纯汇编函数、文件级汇编。
+- DsOS：RP2350 → Thumb/.uf2；Zero 2 W → AArch64/kernel8.img（不是 UF2）。
+- 详见 `spec/DS-CUT.md`、`docs/DSOS.md`。
+
 ## 1. 定位
 
 Ds 是一门**静态类型、显式内存、可裸机运行、编译期可元编程**的系统级语言。

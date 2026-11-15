@@ -11,6 +11,8 @@
 - [为什么是 Ds（优势/对比/适用范围）](docs/WHY-DS.md)
 - [Ds+（plus 分支）一页纸](docs/DS-PLUS.md) · [分支](https://github.com/yzxcrush/ds/tree/ds-plus) · [发布](https://github.com/yzxcrush/ds/releases/tag/ds-plus-v0.1.0)
 - [dspm 包管理规范](docs/DSPM.md)
+- [Ds/Cut 裸机子语言规范](spec/DS-CUT.md) · [编译器原型](cut/README.md)
+- [DsOS 架构初稿](docs/DSOS.md) · [启动/上下文切换/链接脚本](dsos/)
 - [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
 - [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
 - [机器可读关键词表 spec/keywords.json](spec/keywords.json)

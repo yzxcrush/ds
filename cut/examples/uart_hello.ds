@@ -1,0 +1,17 @@
+# Ds/Cut：UART MMIO + 中断
+@static UART0: u32 = 0x10000000
+@static TICKS: u32 = 0x10000010
+
+fn putc(c: u8) {
+    *UART0 = c
+}
+
+@irq fn timer_irq() {
+    *TICKS = *TICKS + 1
+}
+
+fn main() -> u32 {
+    putc(65)
+    putc(66)
+    return 0
+}
