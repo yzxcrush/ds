@@ -7,6 +7,21 @@
 
 > **定义 + 可执行参考驱动**：本仓库给出 Ds v0.1 的完整定位、词法、**77 项全量关键词表**、运算符、字面量、注释、EBNF、语义契约与 `dscc` 编译驱动定义，并附带 **Python 参考驱动**（词法器 → 解析器 → 树遍历解释器）与 `ds` / `dscc` 终端命令。**不产出机器码**，语言规范本身仍是定义稿。
 
+## 一键安装终端驱动
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/yzxcrush/ds/main/install.sh | sh
+```
+
+安装后直接运行：
+
+```sh
+dscc hello.ds
+```
+
+脚本会从 GitHub 下载仓库到 `~/.ds/ds`，生成 `dscc` 命令（Termux 安装到 `$PREFIX/bin`），并自动尝试构建 C 驱动 `ds-c`。
+完整脚本见 [`install.sh`](install.sh)。
+
 ## Ds/Cut 裸机子语言 + DsOS
 
 三层严格超集：**Cut ⊂ Ds ⊂ Ds+**。Cut 是冻结 16 token 的裸机子语言，用于启动/异常向量/最底层驱动：
