@@ -2224,9 +2224,11 @@ class Parser:
                 self.skip_nl()
                 a = self.parse_expr()
                 self.skip_nl()
-                self.expect_punct(",")
-                self.skip_nl()
-                b = self.parse_expr()
+                if self.at_punct(","):
+                    self.advance(); self.skip_nl()
+                    b = self.parse_expr()
+                else:
+                    b = ast.Lit(value=1, line=line, col=col)
                 self.skip_nl()
                 self.expect_punct(")")
                 return ast.Call(
