@@ -82,6 +82,20 @@
         "B3",
         "C/Android subsystem gaps"
       ]
+    },
+    {
+      "id": 7,
+      "name": "B1/B2/B3 closure",
+      "status": "partial",
+      "verified": [
+        "B2 base ASCII",
+        "B3 AddrSymbol base/unsafe",
+        "C unicode strict"
+      ],
+      "blocked_by": [
+        "B1 fixed-width checked integers",
+        "B3 C runtime/real MMIO (delegated to Cut)"
+      ]
     }
   ],
   "next": 7,

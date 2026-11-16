@@ -420,6 +420,28 @@ class ThreadHandle(Task):
 # ---------------------------------------------------------------------------
 # 内存原语（参考驱动的近似实现）
 # ---------------------------------------------------------------------------
+class AddrSymbol:
+    """Cut @static 的地址符号：base 只做安全模拟，真实 MMIO 由 Cut codegen 负责。"""
+
+    __slots__ = ("addr", "elem_size", "type_name")
+
+    def __init__(self, addr: int, elem_size: int = 1, type_name: str = "u8"):
+        self.addr = int(addr)
+        self.elem_size = max(1, int(elem_size))
+        self.type_name = type_name
+
+    def read(self) -> Any:
+        return 0
+
+    def write(self, value: Any) -> _Unit:
+        return UNIT
+
+    def __str__(self) -> str:
+        return str(self.addr)
+
+    __repr__ = __str__
+
+
 class Ptr:
     """ptr[T] / raw：addr 模式模拟任意地址；buf 模式模拟 alloc 出的真实块。"""
 

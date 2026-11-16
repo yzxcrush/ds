@@ -1,6 +1,6 @@
 """Batch 4: pointer type / static address smoke tests."""
 import unittest
-from dsv01.checker import check_program
+from dsv01.checker import check_program, DsCheckError
 from dsv01.parser import parse_program
 from dsv01.interp import Interpreter
 
@@ -8,14 +8,23 @@ from dsv01.interp import Interpreter
 class TestPointer(unittest.TestCase):
     def test_cut_pointer_type_parses(self):
         check_program(parse_program(
-            '@static UART: *u32 = 0x1000\np(*UART)\n', "p.ds"))
+            '@static UART: *u32 = 0x1000\n@unsafe { p(*UART) }\n', "p.ds"))
 
     def test_static_addr_deref(self):
         it = Interpreter()
-        it.run_source('@static UART: u32 = 0x1000\np(*UART)\n')
+        it.run_source('@static UART: u32 = 0x1000\n@unsafe { p(*UART) }\n')
 
     def test_pointer_type_alias(self):
         check_program(parse_program('let p: *u32 = 0x1000\n', "p.ds"))
+
+    def test_static_deref_requires_unsafe(self):
+        with self.assertRaises(DsCheckError) as cm:
+            check_program(parse_program('@static UART: u32 = 0x1000\np(*UART)\n', "p.ds"))
+        self.assertIn("@unsafe", cm.exception.msg)
+
+    def test_static_deref_unsafe_ok(self):
+        check_program(parse_program(
+            '@static UART: u32 = 0x1000\n@unsafe { p(*UART) }\n', "p.ds"))
 
 
 if __name__ == "__main__":
