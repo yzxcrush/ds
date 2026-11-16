@@ -67,6 +67,7 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 - **已冻结批次**：Batch 1（词法/关键字/字面量/换行）、Batch 3（控制流/作用域/求值顺序）
 - **部分冻结**：Batch 2（类型/值/宽度：字面量范围、异构数组、if 分支、64 位位运算已修；**B1 固定宽度整数未完成**）、Batch 4（指针/AddrSymbol：`*T` 类型、`@static` base 模拟已修；**B3 未完成**）、Batch 5（错误/并发/元宏：顶层 try 已修；C/Android 子系统缺口）
 - **下一批**：Batch 6（三端 conformance / 冻结门槛）
+- **下游同步**：Ds+ 已把 base checker 接成 `E_DS_BASE`；Cut 已接受 `*T` 与 `@irq(5) irq fn` 的 base 形式，并有 `cut/tests/test_base_compat.py` 回归
 - 状态文件：`audit/batches.json`、`spec/freeze.json`、`docs/FOUNDATION.md`
 
 ### 语法消歧（写代码/生成代码必须遵守）
