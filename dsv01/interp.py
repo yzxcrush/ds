@@ -161,6 +161,7 @@ class Interpreter:
             ast.InTest: self.ev_in,
             ast.BlockExpr: self.ev_block_expr,
             ast.IfExpr: self.ev_if,
+            ast.LoopExpr: self.ev_loop_expr,
             ast.MatchExpr: self.ev_match,
             ast.FnLit: self.ev_fn_lit,
             ast.TryExpr: self.ev_try_expr,
@@ -866,6 +867,9 @@ class Interpreter:
 
     def ev_block_expr(self, expr: ast.BlockExpr, env: Env) -> Any:
         return self.exec_block(expr.block, env)
+
+    def ev_loop_expr(self, expr: ast.LoopExpr, env: Env) -> Any:
+        return self.ex_loop(ast.LoopStmt(body=expr.body, line=expr.line, col=expr.col), env)
 
     def ev_if(self, expr: ast.IfExpr, env: Env) -> Any:
         cond = self.require_bool(self.eval_expr(expr.cond, env), "if 条件")

@@ -1,0 +1,7 @@
+# 控制流/作用域：loop 表达式与变量遮蔽
+let x = 1
+fn f() { let x = 2; p(x) }
+let y = loop { break 42 }
+p(y)
+f()
+p(x)

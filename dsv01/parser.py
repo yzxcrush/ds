@@ -2160,6 +2160,10 @@ class Parser:
                 return ast.Var(name="recover", line=line, col=col)
             if kw == "if":
                 return self.parse_if()
+            if kw == "loop":
+                self.advance()
+                self.skip_nl()
+                return ast.LoopExpr(body=self.parse_body(), line=line, col=col)
             if kw == "match":
                 return self.parse_match()
             if kw == "spawn":

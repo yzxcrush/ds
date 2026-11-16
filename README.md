@@ -27,6 +27,7 @@ dscc hello.ds
 **先地基，后高楼。** Base 语义冻结门槛通过前，不向 Ds+ / Ds/Cut 增加新能力。
 
 - 规则与验收：[docs/FOUNDATION.md](docs/FOUNDATION.md)
+- 批次状态：[audit/batches.json](audit/batches.json) · [Batch 3](audit/BATCH3.md)
 - 审计与 blocker：[docs/AUDIT-v0.1.md](docs/AUDIT-v0.1.md)
 - 冻结状态：[spec/freeze.json](spec/freeze.json)
 

@@ -1,0 +1,16 @@
+{
+  "updated": "2026-11-16",
+  "batches": [
+    {"id": 1, "name": "lexical/keyword/literal/layer", "status": "frozen",
+     "checks": ["audit/batch1_lexical.py", "Python/C/Android regressions"]},
+    {"id": 2, "name": "types/values/operators/widths", "status": "partial",
+     "verified": ["literal range", "array homogeneity", "if branch type", "64-bit bitwise", "shift bounds"],
+     "blocked_by": ["B1 fixed-width runtime"]},
+    {"id": 3, "name": "control flow/functions/scopes/eval order", "status": "frozen",
+     "checks": ["audit/batch3_control.py", "loop expression", "lexical shadowing"]},
+    {"id": 4, "name": "memory/pointers/AddrSymbol/Cut boundary", "status": "queued"},
+    {"id": 5, "name": "errors/concurrency/meta/ABI", "status": "queued"},
+    {"id": 6, "name": "cross-driver conformance/freeze", "status": "queued"}
+  ],
+  "next": 4
+}

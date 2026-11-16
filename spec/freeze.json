@@ -53,5 +53,14 @@
   ],
   "policy": "docs/FOUNDATION.md",
   "extension_freeze": true,
-  "note": "base semantic gate 未通过前，Ds+ 与 Ds/Cut 不新增能力"
+  "note": "base semantic gate 未通过前，Ds+ 与 Ds/Cut 不新增能力",
+  "batches": {
+    "1": "frozen",
+    "2": "partial",
+    "3": "frozen",
+    "4": "queued",
+    "5": "queued",
+    "6": "queued"
+  },
+  "next_batch": 4
 }

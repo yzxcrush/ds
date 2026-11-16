@@ -559,6 +559,13 @@ class ReturnStmt(Stmt):
 
 
 @dataclass
+class LoopExpr(Expr):
+    body: "Block" = None
+    line: int = 0
+    col: int = 0
+
+
+@dataclass
 class LabelStmt(Stmt):
     name: str = ""
     line: int = 0

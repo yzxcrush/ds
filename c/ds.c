@@ -1862,7 +1862,9 @@ static Value *env_get(Env *env, const char *name, int line, int col) {
     return b->val;
 }
 static void env_def(Env *env, const char *name, Value *val, int is_mut) {
-    Bind *b = env_find(env, name);
+    Bind *b = NULL;
+    for (Bind *x = env->binds; x; x = x->next)
+        if (strcmp(x->name, name) == 0) { b = x; break; }   /* 只当前作用域，允许遮蔽 */
     if (!b) {
         b = (Bind *)xalloc(sizeof(Bind));
         b->name = name;
