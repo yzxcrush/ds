@@ -148,7 +148,9 @@ class Checker:
         self.sigs: dict[str, Sig] = {}
         self.globals: Scope = Scope()
         self.classes: dict[str, dict[str, Sig]] = {}
+        self.statics: dict[str, str] = {}
         self.current_fn: str | None = None
+        self.unsafe_depth: int = 0
         self.errors: list[DsCheckError] = []
 
     # ------------------------------------------------------------------
@@ -178,6 +180,8 @@ class Checker:
                 self.globals.types[item.name] = item.name
             elif isinstance(item, ast.TypeDecl):
                 self.globals.types[item.name] = item.name
+            elif isinstance(item, ast.StaticDecl):
+                self.statics.setdefault(item.name, _t(item.type) or "u32")
             elif isinstance(item, ast.ImplDecl):
                 for m in item.methods:
                     self.sigs.setdefault(m.name, self.fn_sig(m, method=True))
@@ -426,6 +430,19 @@ class Checker:
             return t
         if isinstance(e, ast.Cast):
             return _t(e.type)
+        if isinstance(e, ast.Deref):
+            self.infer(e.expr, scope)
+            if isinstance(e.expr, ast.Var) and e.expr.name in self.statics and self.unsafe_depth == 0:
+                self.err("`@static` 地址解引用必须在 @unsafe 或 Cut 模式中", e)
+            t = self.type_of(e.expr)
+            return t[1:] if isinstance(t, str) and t.startswith("*") else None
+        if isinstance(e, ast.UnsafeBlock):
+            self.unsafe_depth += 1
+            try:
+                self.check_block(e.block, self.child(scope), in_func=self.current_fn is not None)
+            finally:
+                self.unsafe_depth -= 1
+            return None
         if isinstance(e, ast.IfExpr):
             self.check_cond(e.cond, scope, e)
             a = self.infer_block_value(e.then_block, scope)

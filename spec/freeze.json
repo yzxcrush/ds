@@ -53,14 +53,15 @@
   ],
   "policy": "docs/FOUNDATION.md",
   "extension_freeze": false,
-  "note": "只冻结 base 已验证部分；Ds+/Cut 不冻结，继续同步 base 修复并独立演进",
+  "note": "B1 仍是 critical blocker；B2 base/B3 base 检查已冻结；C 运行期/真实 MMIO 下沉 Cut",
   "batches": {
     "1": "frozen",
     "2": "partial",
     "3": "frozen",
     "4": "partial",
     "5": "partial",
-    "6": "verified-partial"
+    "6": "verified-partial",
+    "7": "partial"
   },
   "next_batch": 7,
   "partial_freeze_tag": "base-partial-freeze-2026-11",
@@ -77,5 +78,7 @@
     "D10": "ds+/cut not frozen",
     "D11": "ds+ inherits base checker"
   },
-  "extension_policy": "additive-only; hard semantics delegated to ds+/cut"
+  "extension_policy": "additive-only; hard semantics delegated to ds+/cut",
+  "b2_base": "frozen",
+  "b3_base_checker": "frozen"
 }

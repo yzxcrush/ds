@@ -444,8 +444,8 @@ class Interpreter:
                 except Exception:
                     addr = 0
                 elem = self.type_size(item.type) if item.type is not None else 1
-                value = bi.Ptr(addr=addr, elem_size=max(1, elem),
-                               type_name=bi.type_name_of(item.type) or "u8")
+                value = bi.AddrSymbol(addr=addr, elem_size=max(1, elem),
+                                      type_name=bi.type_name_of(item.type) or "u8")
             env.define(item.name, value, mutable=item.mutable)
             return
         raise bi.DsRuntimeError(f"无法延迟执行的声明：{type(item).__name__}")
@@ -1035,7 +1035,7 @@ class Interpreter:
 
     def ev_deref(self, expr: ast.Deref, env: Env) -> Any:
         value = self.eval_expr(expr.expr, env)
-        if isinstance(value, bi.Ptr):
+        if isinstance(value, (bi.Ptr, bi.AddrSymbol)):
             return value.read()
         if isinstance(value, bi.RefBox):
             return value.getter()
