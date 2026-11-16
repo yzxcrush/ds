@@ -33,6 +33,12 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 
 经典/0.1c/Flow 三者可分别混用；Flow 相比 0.1c 再省约 15% token。详见 `spec/DS-FLOW.md`。
 
+## 0f. Base 部分冻结 / Ds+ 状态（2026-11）
+
+- Base 已验证部分已冻结：77 关键字/语法、Batch 1、Batch 3；B1/B2/B3 仍开放。
+- **Ds+ 不冻结**，继续继承 base 修复并独立演进。
+- Ds+ checker 先跑 base checker，base 错误显示 `E_DS_BASE`。
+- Ds+ 仍必须保持 base 代码 100% 编译通过。
 ## 1. 定位
 
 Ds 是一门**静态类型、显式内存、可裸机运行、编译期可元编程**的系统级语言。
