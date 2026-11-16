@@ -22,6 +22,14 @@ dscc hello.ds
 脚本会从 GitHub 下载仓库到 `~/.ds/ds`，生成 `dscc` 命令（Termux 安装到 `$PREFIX/bin`），并自动尝试构建 C 驱动 `ds-c`。
 完整脚本见 [`install.sh`](install.sh)。
 
+## 地基工程规则
+
+**先地基，后高楼。** Base 语义冻结门槛通过前，不向 Ds+ / Ds/Cut 增加新能力。
+
+- 规则与验收：[docs/FOUNDATION.md](docs/FOUNDATION.md)
+- 审计与 blocker：[docs/AUDIT-v0.1.md](docs/AUDIT-v0.1.md)
+- 冻结状态：[spec/freeze.json](spec/freeze.json)
+
 ## Base 冻结状态
 
 **语法表面已冻结候选，语义尚未冻结**。原因与门槛见 [docs/FREEZE.md](docs/FREEZE.md)：

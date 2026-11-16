@@ -1,7 +1,7 @@
 {
   "name": "Ds Base Freeze Policy",
   "base_version": "0.1",
-  "status": "syntax-candidate",
+  "status": "foundation-work",
   "syntax_frozen": true,
   "semantics_frozen": false,
   "can_freeze_semantics_now": false,
@@ -50,5 +50,8 @@
     "Unicode 策略写入规范并由三端执行（B2）",
     "Cut @static 以 AddrSymbol 表示（B3）",
     "base 语法冻结后只接受修 bug，不新增关键字"
-  ]
+  ],
+  "policy": "docs/FOUNDATION.md",
+  "extension_freeze": true,
+  "note": "base semantic gate 未通过前，Ds+ 与 Ds/Cut 不新增能力"
 }
