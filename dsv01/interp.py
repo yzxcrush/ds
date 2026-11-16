@@ -297,6 +297,8 @@ class Interpreter:
             fn = bi.DsFunction(item, env, self, is_class_method=False)
             env.define(item.name, fn, mutable=False)
             return
+        if isinstance(item, ast.NopItem):
+            return
         if isinstance(item, ast.LetItem):
             ctx.deferred.append(item)
             return

@@ -85,3 +85,22 @@ class TestChecker(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCrossDriverAudit(unittest.TestCase):
+    def test_array_elements_must_be_homogeneous(self):
+        with self.assertRaises(DsCheckError) as cm:
+            check('p([1, "x"])\n')
+        self.assertIn("数组元素类型不一致", cm.exception.msg)
+
+    def test_array_homogeneous_ok(self):
+        check("p([1, 2, 3])\np([1, 2, 3])\n")
+
+    def test_if_branch_types_must_match(self):
+        with self.assertRaises(DsCheckError) as cm:
+            check('let x = if true { 1 } else { "s" }\np(x)\n')
+        self.assertIn("if 分支类型不一致", cm.exception.msg)
+
+    def test_cut_attribute_forms_parse_in_base(self):
+        check('@static var UART: u32 = 0x1000\n@irq fn tick() { }\n'
+              'fn f() { @asm "nop" }\np(UART)\n')

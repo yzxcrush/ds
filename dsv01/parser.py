@@ -415,6 +415,19 @@ class Parser:
             self.advance()
             self.skip_nl()
         t = self.tok
+        if "asm" in attrs and t.kind in (STRING,):
+            self.advance()
+            self.skip_nl()
+            if self.at_punct("("):
+                depth = 1
+                self.advance()
+                while depth > 0 and not self.at_eof():
+                    if self.at_punct("("): depth += 1
+                    elif self.at_punct(")"): depth -= 1
+                    self.advance()
+            return ast.NopItem(line=line, col=col)
+        if "static" in attrs and t.kind in (IDENT, RAW_IDENT):
+            return self.parse_static_binding(attrs, line, col)
         if self.flow and t.kind == OP and t.text == "\\":
             fn = self.parse_fn_flow()
             fn.vis = vis
@@ -955,6 +968,17 @@ class Parser:
             at_addr=at_addr, vis=vis, attrs=attrs, line=line, col=col,
         )
 
+    def parse_static_binding(self, attrs, line, col) -> ast.StaticDecl:
+        name = self.parse_name()
+        ty = None
+        value = None
+        if self.at_punct(":"):
+            self.advance(); self.skip_nl(); ty = self.parse_type()
+        if self.at_sym("="):
+            self.advance(); self.skip_nl(); value = self.parse_expr()
+        return ast.StaticDecl(name=name, mutable=False, type=ty, value=value,
+                              at_addr=value, attrs=attrs, line=line, col=col)
+
     def parse_extern_decl(self, vis, attrs, line, col) -> ast.ExternDecl:
         self.expect_kw("extern")
         self.skip_nl()
@@ -1311,6 +1335,18 @@ class Parser:
     def parse_stmt(self) -> ast.Stmt:
         t = self.tok
         line, col = t.line, t.col
+        if self.at_kw("@") and self.peek_sig(1).text == "asm":
+            self.advance(); self.advance()
+            self.skip_nl()
+            if self.tok.kind == STRING:
+                self.advance()
+            elif self.at_punct("("):
+                depth = 1; self.advance()
+                while depth > 0 and not self.at_eof():
+                    if self.at_punct("("): depth += 1
+                    elif self.at_punct(")"): depth -= 1
+                    self.advance()
+            return ast.ExprStmt(expr=ast.Lit(value=None, line=line, col=col), line=line, col=col)
         if self.flow and t.kind == OP and t.text == "?":
             return self.parse_flow_if(as_stmt=True)
         if self.flow and t.kind == OP and t.text == "^":

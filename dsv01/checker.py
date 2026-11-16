@@ -184,6 +184,8 @@ class Checker:
         elif isinstance(item, ast.ModDecl):
             for sub in getattr(item, "items", []) or []:
                 self.check_item(sub)
+        elif isinstance(item, ast.NopItem):
+            return
         elif isinstance(item, (ast.LetItem, ast.StaticDecl)):
             self.check_top_let(item)
 
@@ -408,13 +410,33 @@ class Checker:
             a = self.infer_block_value(e.then_block, scope)
             b = self.infer(e.else_, scope) if isinstance(e.else_, ast.Expr) else (
                 self.infer_block_value(e.else_, scope) if isinstance(e.else_, ast.Block) else None)
-            if a and b and a != b:
-                return None
+            if a and b:
+                if a == "intlit" and b in INT_RANGES:
+                    a = b
+                elif b == "intlit" and a in INT_RANGES:
+                    b = a
+                if a != b:
+                    self.err(f"if 分支类型不一致：{a} 与 {b}", e)
+                    return None
             return a or b
         if isinstance(e, ast.BlockExpr):
             return self.infer_block_value(e.block, scope)
         if isinstance(e, ast.ArrayLit):
-            for it in e.items: self.infer(it, scope)
+            known: list[str] = []
+            for it in e.items:
+                t = self.infer(it, scope)
+                if t in (None, "?"):
+                    continue
+                if t == "intlit":
+                    t = "i32"
+                known.append(t)
+            if known:
+                base = known[0]
+                for t in known[1:]:
+                    if t == base:
+                        continue
+                    self.err(f"数组元素类型不一致：{base} 与 {t}（无隐式提升）", e)
+                    break
             return "array"
         if isinstance(e, ast.MapLit):
             for k in getattr(e, "keys", []): self.infer(k, scope)

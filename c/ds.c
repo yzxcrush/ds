@@ -642,6 +642,9 @@ static Node *make_var_node(const char *name, int line, int col);
 static Node *parse_expr(int min_prec);
 static Node *parse_stmt(int top_level);
 static Node *parse_fn(void);
+static Node *make_noop_stmt(int line, int col);
+static Node *parse_static_binding(Tok *at);
+static Node *parse_at_item(void);
 static Node *parse_let(int top_level);
 
 /* 本子集不支持的声明/语句：给出清晰错误（避免静默误编译） */
@@ -811,6 +814,35 @@ static Node *parse_stmt(int top_level) {
         return n;
     }
     if (is_punct('{')) return parse_block();
+    if (is_kw("@")) {
+        adv();
+        skip_nl();
+        if (is_kw("asm")) {
+            adv();
+            skip_nl();
+            if (cur()->kind == TK_STR) adv();
+            else if (is_punct('(')) {
+                int depth = 1; adv();
+                while (depth > 0 && cur()->kind != TK_EOF) {
+                    if (is_punct('(')) depth++;
+                    else if (is_punct(')')) depth--;
+                    adv();
+                }
+            }
+            return make_noop_stmt(t->line, t->col);
+        }
+        if (is_kw("static")) {
+            adv(); skip_nl();
+            if (is_kw("var") || is_kw("let")) return parse_let(top_level);
+            return parse_static_binding(t);
+        }
+        if (is_kw("unsafe")) {
+            adv(); skip_nl();
+            if (is_punct('{')) return parse_block();
+            return parse_stmt(top_level);
+        }
+        ds_fail(t->line, t->col, "未知 @ 属性");
+    }
     if (is_kw("let") || is_kw("var")) return parse_let(top_level);
 
     if (is_kw("if")) return parse_if_expr();
@@ -1451,6 +1483,80 @@ static Node *parse_use(void) {
     return n;
 }
 
+
+static Node *make_noop_stmt(int line, int col) {
+    Node *lit = node_new(ND_LIT_INT, line, col);
+    lit->ival = 0;
+    Node *st = node_new(ND_EXPRSTMT, line, col);
+    st->a = lit;
+    return st;
+}
+
+static Node *parse_static_binding(Tok *at) {
+    /* Cut 形式：@static NAME: T = ADDR（没有 let/var 关键字） */
+    skip_nl();
+    const char *name = expect_ident("静态符号名");
+    Node *n = node_new(ND_LET, at->line, at->col);
+    n->name = name;
+    n->bval = 0;
+    skip_nl();
+    if (is_punct(':')) { adv(); n->type_name = read_type_tag(); }
+    skip_nl();
+    if (is_op("=")) { adv(); n->a = parse_expr(1); }
+    return n;
+}
+
+static Node *parse_at_item(void) {
+    Tok *at = cur();
+    adv(); /* @ */
+    skip_nl();
+    if (is_kw("irq")) {
+        adv();
+        if (is_punct('(')) {
+            adv();
+            int depth = 1;
+            while (depth > 0 && cur()->kind != TK_EOF) {
+                if (is_punct('(')) depth++;
+                else if (is_punct(')')) depth--;
+                adv();
+            }
+        }
+        skip_nl();
+        if (is_kw("irq")) adv();
+        skip_nl();
+        return parse_fn();
+    }
+    if (is_kw("static")) {
+        adv();
+        skip_nl();
+        if (is_kw("var") || is_kw("let")) return parse_let(1);
+        return parse_static_binding(at);
+    }
+    if (is_kw("asm")) {
+        adv();
+        skip_nl();
+        if (cur()->kind == TK_STR) adv();
+        else if (is_punct('(')) {
+            int depth = 1;
+            adv();
+            while (depth > 0 && cur()->kind != TK_EOF) {
+                if (is_punct('(')) depth++;
+                else if (is_punct(')')) depth--;
+                adv();
+            }
+        }
+        return make_noop_stmt(at->line, at->col);
+    }
+    if (is_kw("unsafe")) {
+        adv();
+        skip_nl();
+        if (is_punct('{')) return parse_block();
+        return parse_stmt(0);
+    }
+    ds_fail(at->line, at->col, "未知 @ 属性");
+    return NULL;
+}
+
 static Node *parse_program(int repl_mode) {
     P_POS = 0;
     Node *prog = node_new(ND_PROGRAM, 1, 1);
@@ -1478,6 +1584,7 @@ static Node *parse_program(int repl_mode) {
         }
         Node *item = NULL;
         if (g_flow && cur()->kind == TK_OP && strcmp(cur()->s, "\\") == 0) item = parse_fn_flow();
+        else if (is_kw("@")) item = parse_at_item();
         else if (is_kw("use")) item = parse_use();
         else if (is_kw("fn")) item = parse_fn();
         else if (is_kw("let") || is_kw("var")) item = parse_let(1);
@@ -2725,7 +2832,18 @@ static const char *sem_infer(Node *e, TypeEnv *env, Node *prog) {
         case ND_LIT_STR: return "str";
         case ND_LIT_BYTES: return "bytes";
         case ND_LIT_BOOL: return "bool";
-        case ND_ARRAY: return "array";
+        case ND_ARRAY: {
+            const char *base = NULL;
+            for (int i = 0; i < e->nitems; i++) {
+                const char *t = sem_infer(e->items[i], env, prog);
+                if (!t || strcmp(t, "?") == 0) continue;
+                if (strcmp(t, "intlit") == 0) t = "i32";
+                if (!base) base = t;
+                else if (strcmp(base, t) != 0)
+                    sem_fail(e, "数组元素类型不一致（无隐式提升）");
+            }
+            return "array";
+        }
         case ND_MAP: return "map";
         case ND_VAR: return te_get(env, e->name);
         case ND_UNARY: return e->name && strcmp(e->name,"!")==0 ? "bool" : sem_infer(e->a, env, prog);
@@ -2747,6 +2865,7 @@ static const char *sem_infer(Node *e, TypeEnv *env, Node *prog) {
             return NULL;
         }
         case ND_CALL: {
+            for (int i = 0; i < e->nitems; i++) sem_infer(e->items[i], env, prog);
             if (!e->a || e->a->kind != ND_VAR) return NULL;
             const char *n = e->a->name;
             if (strcmp(n,"p")==0||strcmp(n,"println")==0||strcmp(n,"print")==0) return "unit";
@@ -2759,7 +2878,13 @@ static const char *sem_infer(Node *e, TypeEnv *env, Node *prog) {
             const char *a = (e->b && e->b->kind==ND_BLOCK) ? sem_block_tail(e->b, env, prog) : NULL;
             const char *b = (e->c && e->c->kind==ND_BLOCK) ? sem_block_tail(e->c, env, prog) :
                             (e->c ? sem_infer(e->c, env, prog) : NULL);
-            return (a && b && strcmp(a,b)==0) ? a : NULL;
+            if (a && b) {
+                if (strcmp(a,"intlit")==0 && sem_is_int(b)) a = b;
+                else if (strcmp(b,"intlit")==0 && sem_is_int(a)) b = a;
+                if (strcmp(a,b)!=0) sem_fail(e, "if 分支类型不一致");
+                return a;
+            }
+            return NULL;
         }
         case ND_BLOCKEXPR: return sem_block_tail(e->b, env, prog);
         default: return NULL;

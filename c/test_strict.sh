@@ -35,10 +35,17 @@ fn bar() {
 }
 bar()
 DS
-for f in ret miss annot topret conversion widen; do
+cat > "$TMP/mixed_array.ds" <<'DS'
+p([1, "x"])
+DS
+cat > "$TMP/if_mixed.ds" <<'DS'
+let x = if true { 1 } else { "s" }
+p(x)
+DS
+for f in ret miss annot topret conversion widen mixed_array if_mixed; do
   if c/build/ds "$TMP/$f.ds" >"$TMP/out" 2>"$TMP/err"; then
     echo "✗ $f 应失败却成功：$(cat "$TMP/out")" >&2; exit 1
   fi
   grep -q "error:" "$TMP/err" || { echo "✗ $f 没有清晰错误" >&2; cat "$TMP/err" >&2; exit 1; }
 done
-echo "✓ C 驱动严格性测试通过（6 项）"
+echo "✓ C 驱动严格性测试通过（8 项）"

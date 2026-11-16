@@ -736,6 +736,13 @@ class StaticDecl(Item):
 
 
 @dataclass
+class NopItem(Item):
+    """编译期无操作项（Cut @asm 在 base 层的兼容占位）。"""
+    line: int = 0
+    col: int = 0
+
+
+@dataclass
 class ExternDecl(Item):
     abi: str = "C"
     name: "str | None" = None
