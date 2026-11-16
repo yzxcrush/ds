@@ -103,6 +103,12 @@ unary():
 
 完整表见 `spec/DS-CUT.md` §6。
 
+## 与 base 的同步
+
+- Cut 的 `*T` 指针类型在 base 中作为 `ptr[T]` 别名接受；`@static` 地址符号在 base 中可 `--check`。
+- `@irq(5) irq fn`（base 属性形式）与 `@irq(5) fn` 均可解析。
+- Cut 代码必须能通过 base `dscc --check`；`cut/tests/test_base_compat.py` 是这个约束的回归。
+
 ## 当前原型限制
 
 - AArch64 **只支持纯 @asm 函数**（启动/上下文切换）；普通函数代码生成待 v0.2。

@@ -302,6 +302,9 @@ class Parser:
                 t = self.adv()
                 if self.at("("):
                     self.adv(); no = int(self.expect_int()); self.expect(")")
+                self.skip_nl()
+                if self.at("irq"):
+                    self.adv(); self.skip_nl()
                 p.items.append(self.fn_decl(irq, no, t))
             elif self.at("fn"):
                 p.items.append(self.fn_decl(False, None, self.cur()))
