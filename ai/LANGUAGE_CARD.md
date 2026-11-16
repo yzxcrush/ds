@@ -67,6 +67,8 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 - **已冻结批次**：Batch 1（词法/关键字/字面量/换行）、Batch 3（控制流/作用域/求值顺序）
 - **部分冻结**：Batch 2（类型/值/宽度：字面量范围、异构数组、if 分支、64 位位运算已修；**B1 固定宽度整数未完成**）、Batch 4（指针/AddrSymbol：`*T` 类型、`@static` base 模拟已修；**B3 未完成**）、Batch 5（错误/并发/元宏：顶层 try 已修；C/Android 子系统缺口）
 - **冻结标签**：`base-partial-freeze-2026-11`（partial-freeze；Ds+/Cut 不冻结）
+- **D1–D11 已锁定（全 A）**：Base/Ds+ 整数 checked、Cut wrap；Base ASCII、Unicode 属 Ds+/Android 扩展；`@static` 地址值、解引用仅 `@unsafe`/Cut；`as` 位级截断；常量溢出编译错误；`ptr[T]`/`*T` 别名；C `@static` 模拟；`[expr;N]` 不支持；Ds+/Cut 不冻结且必须继承 base checker
+- **只加不减**：难校验语义下沉 Ds+/Cut；Base 保留语法入口，不承担真实硬件/Unicode 复杂度；详见 `docs/CORE-EXTENSION-SPLIT.md`
 - **下一批**：Batch 7（仅 base 未验证项/扩展 conformance，不冻结 Ds+/Cut）
 - **下游同步**：Ds+ 已把 base checker 接成 `E_DS_BASE`；Cut 已接受 `*T` 与 `@irq(5) irq fn` 的 base 形式，并有 `cut/tests/test_base_compat.py` 回归
 - 状态文件：`audit/batches.json`、`spec/freeze.json`、`docs/FOUNDATION.md`
