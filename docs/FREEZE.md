@@ -2,9 +2,12 @@
 
 ## 结论
 
-**不能现在冻结语义，也不能保证“没有暗 bug”。**
+**本轮冻结的是 base 已验证部分（partial-freeze），不是完整语义。**
 
-理由：当前审计仍有 5 个 blocker。冻结一个带未定义整数宽度、未统一 `@static` 语义、Unicode 跨端不一致的 base，会把这些隐患固化成 OS 的地基。
+标签：`base-partial-freeze-2026-11`。  
+已验证：77 关键字/语法、Batch 1、Batch 3、字面量范围/数组/if/位运算/`*T` 等子项。  
+未冻结：B1 固定宽度、B2 Unicode、B3 AddrSymbol。  
+**Ds+ / Ds/Cut 不冻结**，继续独立演进并继承 base 修复。
 
 现在可以冻结的是：
 
@@ -46,7 +49,7 @@ Ds Base（--app）：稳定核心，只修 bug，不新增关键字
 机器可读状态：`spec/freeze.json`  
 检查命令：`python3 tools/freeze_check.py`
 
-语义冻结后版本建议命名为 **`ds-core-v1`**；在此之前版本继续是 `0.1.x`，不承诺 ABI/语义稳定。
+完整语义冻结后版本才命名 **`ds-core-v1`**；在此之前版本继续是 `0.1.x`，不承诺完整 ABI/语义稳定。
 
 ## 为什么“测试全绿”仍不能保证无 bug
 

@@ -24,7 +24,7 @@ dscc hello.ds
 
 ## 地基工程规则
 
-**先地基，后高楼。** Base 语义冻结门槛通过前，不向 Ds+ / Ds/Cut 增加新能力。
+**先地基，后高楼。** Base 已验证部分已冻结；**Ds+ / Ds/Cut 不冻结**，可独立演进，但必须继承 base 修复并通过 conformance。
 
 - 规则与验收：[docs/FOUNDATION.md](docs/FOUNDATION.md)
 - 批次状态：[audit/batches.json](audit/batches.json) · [Batch 3](audit/BATCH3.md)
