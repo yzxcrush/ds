@@ -1,0 +1,54 @@
+{
+  "name": "Ds Base Freeze Policy",
+  "base_version": "0.1",
+  "status": "syntax-candidate",
+  "syntax_frozen": true,
+  "semantics_frozen": false,
+  "can_freeze_semantics_now": false,
+  "keywords": 77,
+  "layers": {
+    "base": "--app (Ds)",
+    "software": "--plus (Ds+)",
+    "hardware": "--cut (Ds/Cut)"
+  },
+  "blockers": [
+    {
+      "id": "B1",
+      "title": "fixed-width integer semantics / overflow",
+      "severity": "critical",
+      "must_fix_before": "semantic-freeze"
+    },
+    {
+      "id": "B2",
+      "title": "Unicode/emoji identifier policy across drivers",
+      "severity": "high",
+      "must_fix_before": "semantic-freeze"
+    },
+    {
+      "id": "B3",
+      "title": "AddrSymbol: Cut @static vs Ds static semantics",
+      "severity": "high",
+      "must_fix_before": "semantic-freeze"
+    },
+    {
+      "id": "B4",
+      "title": "Android Ds+ virtual hardware is not real target execution",
+      "severity": "medium",
+      "must_fix_before": "kernel-validation"
+    },
+    {
+      "id": "B5",
+      "title": "value-level array repeat [expr; N] is not implemented",
+      "severity": "medium",
+      "must_fix_before": "language-completeness"
+    }
+  ],
+  "gates": [
+    "spec/keywords.json 恰好 77 项",
+    "Python/C/Android 三端负面用例一致",
+    "固定宽度边界测试通过（B1）",
+    "Unicode 策略写入规范并由三端执行（B2）",
+    "Cut @static 以 AddrSymbol 表示（B3）",
+    "base 语法冻结后只接受修 bug，不新增关键字"
+  ]
+}

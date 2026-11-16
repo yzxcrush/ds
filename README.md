@@ -22,6 +22,18 @@ dscc hello.ds
 脚本会从 GitHub 下载仓库到 `~/.ds/ds`，生成 `dscc` 命令（Termux 安装到 `$PREFIX/bin`），并自动尝试构建 C 驱动 `ds-c`。
 完整脚本见 [`install.sh`](install.sh)。
 
+## Base 冻结状态
+
+**语法表面已冻结候选，语义尚未冻结**。原因与门槛见 [docs/FREEZE.md](docs/FREEZE.md)：
+
+```bash
+python3 tools/freeze_check.py
+```
+
+- Base（`--app`）：77 关键字 + 语法表面冻结；只修 bug，不新增关键字
+- Ds+（`--plus`）：软件方向扩展
+- Ds/Cut（`--cut`）：硬件方向扩展
+
 ## Ds/Cut 裸机子语言 + DsOS
 
 三层严格超集：**Cut ⊂ Ds ⊂ Ds+**。Cut 是冻结 16 token 的裸机子语言，用于启动/异常向量/最底层驱动：
