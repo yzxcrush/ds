@@ -63,5 +63,19 @@
     "6": "verified-partial"
   },
   "next_batch": 7,
-  "partial_freeze_tag": "base-partial-freeze-2026-11"
+  "partial_freeze_tag": "base-partial-freeze-2026-11",
+  "decisions": {
+    "D1": "base/ds+ checked, cut wrap",
+    "D2": "base ASCII; unicode extension",
+    "D3": "address value; deref only unsafe/cut",
+    "D4": "as truncates",
+    "D5": "const overflow compile error",
+    "D6": "ptr[T] base, *T cut alias",
+    "D7": "C static address emulate",
+    "D8": "no [expr;N]",
+    "D9": "partial-freeze only",
+    "D10": "ds+/cut not frozen",
+    "D11": "ds+ inherits base checker"
+  },
+  "extension_policy": "additive-only; hard semantics delegated to ds+/cut"
 }

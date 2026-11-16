@@ -27,6 +27,7 @@ dscc hello.ds
 **先地基，后高楼。** Base 已验证部分已冻结；**Ds+ / Ds/Cut 不冻结**，可独立演进，但必须继承 base 修复并通过 conformance。
 
 - 规则与验收：[docs/FOUNDATION.md](docs/FOUNDATION.md)
+- 核心/扩展分层与 D1–D11：[docs/CORE-EXTENSION-SPLIT.md](docs/CORE-EXTENSION-SPLIT.md)
 - 批次状态：[audit/batches.json](audit/batches.json) · [Batch 3](audit/BATCH3.md)
 - 审计与 blocker：[docs/AUDIT-v0.1.md](docs/AUDIT-v0.1.md)
 - 冻结状态：[spec/freeze.json](spec/freeze.json)
