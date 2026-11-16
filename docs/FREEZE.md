@@ -38,8 +38,8 @@ Ds Base（--app）：稳定核心，只修 bug，不新增关键字
 | ID | 条件 | 状态 |
 |---|---|---|
 | B1 | 固定宽度整数（u8/u16/u32/i32…）+ 溢出策略统一 | ❌ |
-| B2 | Unicode/emoji 标识符策略写入规范并由三端执行 | ❌ |
-| B3 | Cut `@static` 用 AddrSymbol 表示，与 Ds `static` 分离 | ❌ |
+| B2 | Base ASCII 已冻结；Ds+/Android Unicode 扩展待做 | ⚠️ |
+| B3 | Base AddrSymbol/unsafe 检查已冻结；C 运行期/真实 MMIO 归 Cut | ⚠️ |
 | B4 | 真实 Thumb/AArch64 后端替代 Android 虚拟 Ds+ 验证内核 | ❌（内核阶段） |
 | B5 | 值级数组重复 `[expr; N]` 决策（支持或明确禁止） | ❌ |
 | G1 | 77 关键字校验 | ✅ |

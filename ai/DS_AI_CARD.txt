@@ -26,7 +26,8 @@ Ds 是静态类型、显式内存、可裸机运行、编译期可元编程的�
 - Ds+ / Ds/Cut 不冻结，继续独立演进并继承 base 修复。
 - D1–D11 全 A：Base/Ds+ 整数 checked；Cut wrap；Base ASCII；`@static` 地址值仅 @unsafe/Cut 解引用；`as` 截断；Ds+/Cut 只加不减。
 - Batch 1（词法）、Batch 3（控制流/作用域）已冻结；Batch 2/4/5 部分冻结。
-- 写 OS/内核前必须先解决：B1 固定宽度整数、B2 Unicode 策略、B3 AddrSymbol。
+- 已冻结：B2 base ASCII；B3 base AddrSymbol + `*@static` 仅 @unsafe/Cut。
+- 写 OS/内核前必须先解决：B1 固定宽度 checked 整数；B2 Unicode 扩展；B3 C 运行期/真实 MMIO（归 Cut）。
 - 指针类型：Cut 的 `*T` 在 base 作为 `ptr[T]` 别名；`@static NAME: T = ADDR` 是地址符号。
 - 语法消歧：`*`/`&` 前缀 vs 中缀；`..` 区间；`<` 只比较；泛型用 `[]`；
   `@` 只接属性；`{k:v}` 映射；`:` 标签/映射/类型按位置判定。

@@ -16,19 +16,22 @@
       "id": "B1",
       "title": "fixed-width integer semantics / overflow",
       "severity": "critical",
-      "must_fix_before": "semantic-freeze"
+      "must_fix_before": "semantic-freeze",
+      "status": "open-critical"
     },
     {
       "id": "B2",
       "title": "Unicode/emoji identifier policy across drivers",
       "severity": "high",
-      "must_fix_before": "semantic-freeze"
+      "must_fix_before": "semantic-freeze",
+      "status": "base-ascii-frozen; ds+/android unicode extension open"
     },
     {
       "id": "B3",
       "title": "AddrSymbol: Cut @static vs Ds static semantics",
       "severity": "high",
-      "must_fix_before": "semantic-freeze"
+      "must_fix_before": "semantic-freeze",
+      "status": "base-addr-symbol-checker-frozen; C runtime/Cut MMIO pending"
     },
     {
       "id": "B4",
