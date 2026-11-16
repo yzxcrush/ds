@@ -1660,6 +1660,11 @@ class Parser:
         self.skip_nl()
         t = self.tok
         line, col = t.line, t.col
+        if t.kind == OP and t.text == "*":
+            # Cut 指针类型 *T：base 类型系统用 PtrType 承载
+            self.advance()
+            self.skip_nl()
+            return ast.PtrType(inner=self.parse_type(), line=line, col=col)
         if t.kind == BLANK:
             self.advance()
             return ast.InferredType(line=line, col=col)

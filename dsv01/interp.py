@@ -437,6 +437,15 @@ class Interpreter:
             return
         if isinstance(item, ast.StaticDecl):
             value = self.eval_expr(item.value, env) if item.value is not None else bi.UNIT
+            # Cut 的 @static 是地址符号：base 用 Ptr(addr=...) 模拟只读/写地址
+            if item.at_addr is not None or "static" in (item.attrs or []):
+                try:
+                    addr = int(value)
+                except Exception:
+                    addr = 0
+                elem = self.type_size(item.type) if item.type is not None else 1
+                value = bi.Ptr(addr=addr, elem_size=max(1, elem),
+                               type_name=bi.type_name_of(item.type) or "u8")
             env.define(item.name, value, mutable=item.mutable)
             return
         raise bi.DsRuntimeError(f"无法延迟执行的声明：{type(item).__name__}")
@@ -914,6 +923,8 @@ class Interpreter:
         if isinstance(value, bi.Res):
             if value.ok:
                 return value.value
+            if getattr(self, "depth", 0) <= 0:
+                raise bi.DsRuntimeError("`try` 在顶层没有可返回的 res 函数")
             raise bi.TryPropagate(value.value)
         raise bi.DsRuntimeError("`try` 的操作数必须是 res")
 

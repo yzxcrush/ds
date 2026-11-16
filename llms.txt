@@ -14,6 +14,7 @@
 - [Ds/Cut 裸机子语言规范](spec/DS-CUT.md) · [编译器原型](cut/README.md)
 - [DsOS 架构初稿](docs/DSOS.md) · [启动/上下文切换/链接脚本](dsos/)
 - [DSOSS 标准（DsOS Standard Specification）](spec/DSOSS.md) · [一致性检查器](dsoss/check_conformance.py)
+- [批次验证状态](audit/batches.json) · [Batch 4 报告](audit/BATCH4.md) · [冻结策略](docs/FOUNDATION.md)
 - [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
 - [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
 - [机器可读关键词表 spec/keywords.json](spec/keywords.json)

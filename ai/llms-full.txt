@@ -20,6 +20,7 @@
 - [Ds/Cut 裸机子语言规范](spec/DS-CUT.md) · [编译器原型](cut/README.md)
 - [DsOS 架构初稿](docs/DSOS.md) · [启动/上下文切换/链接脚本](dsos/)
 - [DSOSS 标准（DsOS Standard Specification）](spec/DSOSS.md) · [一致性检查器](dsoss/check_conformance.py)
+- [批次验证状态](audit/batches.json) · [Batch 4 报告](audit/BATCH4.md) · [冻结策略](docs/FOUNDATION.md)
 - [Language Card（AI 一页纸，先读这个）](ai/LANGUAGE_CARD.md)
 - [完整规范 spec/DS-v0.1.md](spec/DS-v0.1.md)
 - [机器可读关键词表 spec/keywords.json](spec/keywords.json)
@@ -1673,6 +1674,39 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 - DsOS：RP2350 → Thumb/.uf2；Zero 2 W → AArch64/kernel8.img（不是 UF2）。
 - **DSOSS**（DsOS Standard Specification）：C0–C4 一致性、双板 profile、manifest + 检查器；DsOS 是实现，DSOSS 是标准。
 - 详见 `spec/DS-CUT.md`、`docs/DSOS.md`、`spec/DSOSS.md`。
+
+## 0e. 当前验证状态（2026-11，AI 必读）
+
+**Base 语法冻结候选；语义尚未冻结**（`ds-core-v1` 未发布）。
+
+- **已冻结批次**：Batch 1（词法/关键字/字面量/换行）、Batch 3（控制流/作用域/求值顺序）
+- **部分冻结**：Batch 2（类型/值/宽度：字面量范围、异构数组、if 分支、64 位位运算已修；**B1 固定宽度整数未完成**）、Batch 4（指针/AddrSymbol：`*T` 类型、`@static` base 模拟已修；**B3 未完成**）、Batch 5（错误/并发/元宏：顶层 try 已修；C/Android 子系统缺口）
+- **下一批**：Batch 6（三端 conformance / 冻结门槛）
+- 状态文件：`audit/batches.json`、`spec/freeze.json`、`docs/FOUNDATION.md`
+
+### 语法消歧（写代码/生成代码必须遵守）
+
+1. `*`：表达式起始/运算符后是解引用；操作数后是乘法。`&` 同理（前缀取地址 / 中缀位与）。
+2. `1..3` 是区间；`1.` 不是合法浮点（写 `1.0`）；`...` 无 spread，报错。
+3. `<` 永远是比较；泛型/定长数组用 `[]`。
+4. `[`：表达式起始=数组字面量；后缀=索引；类型位置=`[]T`/`[T; N]`/泛型参数。
+5. `:`：语句起始 `IDENT:` 是标签；`{}` 内是映射键；声明/参数位置是类型注解。
+6. `{`：`{k:v}`/`{:}` 是映射，其余是块。
+7. `@`：只接属性名或 `{`；Ds+ 的 `@inb/@outb/...` 只在 Ds+ 层；Cut 的 `@static/@asm/@irq` 是属性拼写。
+8. `|>` 是管道；`|` 是按位或；`->` 是返回/函数类型；`=>` 是值分支。
+9. Cut 的指针类型 `*T` 在 base 中作为 `ptr[T]` 的别名接受；`@static NAME: T = ADDR` 是地址符号。
+
+### 当前严格检查
+
+- 无隐式整数宽度转换（`i32 -> u8` 报错，需 `as`）；整数字面量按目标范围检查。
+- 异构数组报错；`if` 分支类型必须一致。
+- 硬关键字不能作绑定名（`new`/`drop` 方法除外）。
+- `try` 在顶层 err 会明确报错，不再产生 internal error。
+
+### Android 扩展（不是 base）
+
+- emoji/Unicode 标识符（Python/C/base 仍 ASCII）；
+- Ds+ 虚拟硬件（`@inb/@outb/@mmap/@asm` 模拟；`@asm` no-op）。
 
 ## 1. 定位
 
