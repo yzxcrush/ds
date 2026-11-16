@@ -658,10 +658,12 @@ class Codegen:
         for i, (_name, _typ) in enumerate(fn.params):
             if i < 4:
                 self.emit(f"  str r{i}, [sp, #{4 * i}]")
+        # 默认返回值放在函数体之前；tail expression / return 会覆盖它。
+        self.emit("  movs r0, #0")
         end = self.label("ret")
         for st in fn.body:
             self.stmt(st, slots, end)
-        self.emit("  movs r0, #0", f"{end}:")
+        self.emit(f"{end}:")
         if frame:
             self.emit(f"  add sp, #{frame}")
         if fn.irq:
