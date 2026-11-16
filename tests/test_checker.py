@@ -3,6 +3,7 @@ import unittest
 
 from dsv01.parser import parse_program
 from dsv01.checker import check_program, DsCheckError
+from dsv01.lexer import DsSyntaxError
 
 
 def check(src):
@@ -100,6 +101,18 @@ class TestCrossDriverAudit(unittest.TestCase):
         with self.assertRaises(DsCheckError) as cm:
             check('let x = if true { 1 } else { "s" }\np(x)\n')
         self.assertIn("if 分支类型不一致", cm.exception.msg)
+
+    def test_keyword_cannot_be_binding_name(self):
+        with self.assertRaises((DsCheckError, DsSyntaxError)):
+            check("let if = 1\np(if)\n")
+
+    def test_negative_u8_literal_rejected(self):
+        with self.assertRaises(DsCheckError) as cm:
+            check("let x: u8 = -1\np(x)\n")
+        self.assertIn("类型不匹配", cm.exception.msg)
+
+    def test_hex_escape(self):
+        check('p("\\x41")\n')
 
     def test_cut_attribute_forms_parse_in_base(self):
         check('@static var UART: u32 = 0x1000\n@irq fn tick() { }\n'

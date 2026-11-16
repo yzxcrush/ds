@@ -255,7 +255,7 @@ static void lex_source(const char *src) {
                             if (!isxdigit((unsigned char)hex[0]) || !isxdigit((unsigned char)hex[1]))
                                 ds_fail(line, (int)(p - src) - line_start + 1, "非法 \\xNN 转义");
                             out = (int)strtol(hex, NULL, 16);
-                            p += 3;
+                            p += 2;
                             break;
                         }
                         case 'u': {
@@ -784,6 +784,7 @@ static Node *parse_let(int top_level) {
     adv(); /* let / var */
     Node *n = node_new(ND_LET, t->line, t->col);
     n->name = expect_ident("变量名");
+    if (strcmp(n->name, "_") == 0) ds_fail(t->line, t->col, "`_` 不能作为变量名");
     n->bval = is_mut;
     skip_nl();
     if (is_punct(':')) {
@@ -1355,7 +1356,12 @@ static Node *parse_primary(void) {
 static Node *parse_postfix(void) {
     Node *e = parse_primary();
     for (;;) {
+        int save_pos = P_POS;
         if (!g_flow) skip_nl();
+        if (!is_punct('(') && !is_punct('[')) {
+            if (!g_flow) P_POS = save_pos;   /* 换行在运算符前终止表达式 */
+            break;
+        }
         if (is_punct('(')) {
             Tok *t = cur();
             adv();
@@ -2801,6 +2807,39 @@ static int sem_compat(const char *actual, const char *expected) {
     if (expected[0]=='[') return strcmp(actual,"array")==0;
     return 1; /* 未知/复合类型：保守放行 */
 }
+
+static int sem_int_bounds(const char *t, int64_t *lo, int64_t *hi) {
+    if (!t) return 0;
+    if (strcmp(t,"i8")==0) { *lo=-128; *hi=127; return 1; }
+    if (strcmp(t,"i16")==0) { *lo=-32768; *hi=32767; return 1; }
+    if (strcmp(t,"i32")==0) { *lo=INT32_MIN; *hi=INT32_MAX; return 1; }
+    if (strcmp(t,"i64")==0||strcmp(t,"isize")==0) { *lo=INT64_MIN; *hi=INT64_MAX; return 1; }
+    if (strcmp(t,"u8")==0) { *lo=0; *hi=255; return 1; }
+    if (strcmp(t,"u16")==0) { *lo=0; *hi=65535; return 1; }
+    if (strcmp(t,"u32")==0) { *lo=0; *hi=4294967295LL; return 1; }
+    if (strcmp(t,"u64")==0||strcmp(t,"usize")==0) { *lo=0; *hi=INT64_MAX; return 1; }
+    return 0;
+}
+static int sem_const_int(const Node *e, int64_t *out) {
+    if (!e) return 0;
+    if (e->kind == ND_LIT_INT) { *out = e->ival; return 1; }
+    if (e->kind == ND_UNARY && e->name && strcmp(e->name, "-") == 0 &&
+        e->a && e->a->kind == ND_LIT_INT) { *out = -e->a->ival; return 1; }
+    if (e->kind == ND_BINARY && e->a && e->b && e->name) {
+        int64_t a, b;
+        if (!sem_const_int(e->a, &a) || !sem_const_int(e->b, &b)) return 0;
+        if (strcmp(e->name, "+") == 0) { *out = a + b; return 1; }
+        if (strcmp(e->name, "-") == 0) { *out = a - b; return 1; }
+        if (strcmp(e->name, "*") == 0) { *out = a * b; return 1; }
+    }
+    return 0;
+}
+static int sem_lit_int_fits(const Node *lit, const char *type) {
+    int64_t lo, hi, v;
+    if (!lit || !sem_int_bounds(type, &lo, &hi)) return 1;
+    if (!sem_const_int(lit, &v)) return 1;
+    return v >= lo && v <= hi;
+}
 static void sem_fail(Node *n, const char *msg) { ds_fail(n->line, n->col, "%s", msg); }
 
 static const char *sem_find_ret(Node *prog, const char *name) {
@@ -2909,6 +2948,8 @@ static void sem_check_stmt(Node *st, TypeEnv *env, Node *prog, const char *ret,
     switch (st->kind) {
         case ND_LET: {
             const char *actual = sem_infer(st->a, env, prog);
+            if (st->type_name && !sem_lit_int_fits(st->a, st->type_name))
+                ds_fail(st->line, st->col, "`%s` 字面量超出 %s 范围", st->name, st->type_name);
             if (st->type_name && !sem_compat(actual, st->type_name))
                 ds_fail(st->line, st->col, "`%s` 类型不匹配：标注 %s，实际 %s",
                         st->name, st->type_name, actual ? actual : "?");
@@ -3001,6 +3042,8 @@ static void check_semantics(Node *prog) {
         if (it->kind == ND_FN) sem_check_fn(it, prog);
         else if (it->kind == ND_LET) {
             const char *actual = sem_infer(it->a, &top, prog);
+            if (it->type_name && !sem_lit_int_fits(it->a, it->type_name))
+                ds_fail(it->line, it->col, "`%s` 字面量超出 %s 范围", it->name, it->type_name);
             if (it->type_name && !sem_compat(actual, it->type_name))
                 ds_fail(it->line, it->col, "`%s` 类型不匹配：标注 %s，实际 %s",
                         it->name, it->type_name, actual ? actual : "?");

@@ -92,6 +92,27 @@ def _lit_type(value: Any) -> str:
     return "?"
 
 
+def _const_int(e: Any) -> int | None:
+    """常量整数折叠：字面量/负号/简单四则；非整数返回 None。"""
+    if isinstance(e, ast.Lit) and isinstance(e.value, int) and not isinstance(e.value, bool):
+        return e.value
+    if isinstance(e, ast.Unary) and e.op == "-":
+        v = _const_int(e.expr)
+        return -v if v is not None else None
+    if isinstance(e, ast.Binary) and e.op in ("+", "-", "*", "/", "%"):
+        a, b = _const_int(e.left), _const_int(e.right)
+        if a is None or b is None:
+            return None
+        if e.op == "+": return a + b
+        if e.op == "-": return a - b
+        if e.op == "*": return a * b
+        if b == 0: return None
+        if e.op == "/":
+            return int(a / b) if (a >= 0) == (b > 0) else -((-a) // b if a < 0 else -(a // -b))
+        return a % b
+    return None
+
+
 def _compat(actual: str | None, expected: str | None, lit: Any = None) -> bool:
     if actual is None or actual == "?" or expected is None:
         return True
@@ -199,7 +220,7 @@ class Checker:
             self.globals.types[item.name] = typ
             return
         actual = self.infer(val, self.globals)
-        if typ and not _compat(actual, typ, getattr(val, "value", None)):
+        if typ and not _compat(actual, typ, _const_int(val)):
             self.err(f"`{item.name}` 类型不匹配：标注 {typ}，实际 {actual or '?'}", item)
         self.globals.types[item.name] = typ or ("i32" if actual == "intlit" else actual)
         if getattr(item, "mutable", False):
@@ -218,7 +239,7 @@ class Checker:
                 scope.mutable.add(p.name)
             if p.default is not None:
                 actual = self.infer(p.default, scope)
-                if _t(p.type) and not _compat(actual, _t(p.type), getattr(p.default, "value", None)):
+                if _t(p.type) and not _compat(actual, _t(p.type), _const_int(p.default)):
                     self.err(f"参数 `{p.name}` 默认值类型不匹配", p)
         self.current_fn = fn.name
         self.check_fn_body(fn, scope)
@@ -256,7 +277,7 @@ class Checker:
         if isinstance(st, ast.LetStmt):
             typ = _t(st.type)
             actual = self.infer(st.value, scope) if st.value is not None else "unit"
-            if typ and not _compat(actual, typ, getattr(st.value, "value", None)):
+            if typ and not _compat(actual, typ, _const_int(st.value)):
                 self.err(f"`{st.name}` 类型不匹配：标注 {typ}，实际 {actual or '?'}", st)
             if st.name in scope.types:
                 self.err(f"同一作用域重复定义 `{st.name}`", st)
@@ -289,7 +310,7 @@ class Checker:
             else:
                 actual = self.infer(st.value, scope)
                 if ret not in (None, *UNIT_TYPES) and "!" not in (ret or ""):
-                    if not _compat(actual, ret, getattr(st.value, "value", None)):
+                    if not _compat(actual, ret, _const_int(st.value)):
                         self.err(f"`return` 类型不匹配：期望 {ret}，实际 {actual or '?'}", st)
                 elif ret in UNIT_TYPES and actual not in ("unit", "?"):
                     self.err(f"函数声明返回 unit，但 return 了 {actual}", st)
@@ -489,7 +510,7 @@ class Checker:
                 for (pname, ptype, _d), arg in zip(sig.params, e.args):
                     if pname == "self": continue
                     at = self.infer(arg, scope)
-                    if ptype and not _compat(at, ptype, getattr(arg, "value", None)):
+                    if ptype and not _compat(at, ptype, _const_int(arg)):
                         self.err(f"调用 `{name}` 参数 `{pname}` 类型不匹配：期望 {ptype}，实际 {at or '?'}", arg)
             return sig.ret
         return BUILTIN_RET.get(name)

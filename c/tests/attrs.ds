@@ -5,3 +5,4 @@
 fn f() { @asm "nop" }
 p(g)
 tick()
+p("\x41")

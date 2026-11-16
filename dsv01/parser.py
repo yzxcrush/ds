@@ -314,6 +314,14 @@ class Parser:
             return t.text
         self.error(f"期望名字，得到 {t.text!r}", t)
 
+    def parse_binding_name(self, what="变量名") -> str:
+        """变量绑定名：硬关键字不能作标识符（`new`/`drop` 只用于方法）。"""
+        t = self.tok
+        if t.kind not in (IDENT, RAW_IDENT):
+            self.error(f"期望{what}，得到 {t.text!r}", t)
+        self.advance()
+        return t.text
+
     # ------------------------------------------------------------------
     # 顶层
     # ------------------------------------------------------------------
@@ -509,7 +517,7 @@ class Parser:
         mutable = self.tok.text == "var"
         self.advance()
         self.skip_nl()
-        name = self.parse_name()
+        name = self.parse_binding_name()
         ty = None
         value = None
         if self.at_punct(":"):

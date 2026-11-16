@@ -42,10 +42,17 @@ cat > "$TMP/if_mixed.ds" <<'DS'
 let x = if true { 1 } else { "s" }
 p(x)
 DS
-for f in ret miss annot topret conversion widen mixed_array if_mixed; do
+cat > "$TMP/keyword.ds" <<'DS'
+let if = 1
+DS
+cat > "$TMP/neg_range.ds" <<'DS'
+let x: u8 = -1
+p(x)
+DS
+for f in ret miss annot topret conversion widen mixed_array if_mixed keyword neg_range; do
   if c/build/ds "$TMP/$f.ds" >"$TMP/out" 2>"$TMP/err"; then
     echo "✗ $f 应失败却成功：$(cat "$TMP/out")" >&2; exit 1
   fi
   grep -q "error:" "$TMP/err" || { echo "✗ $f 没有清晰错误" >&2; cat "$TMP/err" >&2; exit 1; }
 done
-echo "✓ C 驱动严格性测试通过（8 项）"
+echo "✓ C 驱动严格性测试通过（10 项）"
