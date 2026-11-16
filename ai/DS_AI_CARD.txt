@@ -22,7 +22,8 @@ Ds 是静态类型、显式内存、可裸机运行、编译期可元编程的�
 ================================================================
 零、当前状态（2026-11）
 ================================================================
-- Base 已验证部分冻结：tag `base-partial-freeze-2026-11`；完整语义未冻结（ds-core-v1 未发布）。
+- Base 已完整冻结：tag `ds-base-v1`；B1 checked、B2 base ASCII、B3 base AddrSymbol。
+- Ds+ / Ds/Cut 不冻结。
 - Ds+ / Ds/Cut 不冻结，继续独立演进并继承 base 修复。
 - D1–D11 全 A：Base/Ds+ 整数 checked；Cut wrap；Base ASCII；`@static` 地址值仅 @unsafe/Cut 解引用；`as` 截断；Ds+/Cut 只加不减。
 - Batch 1（词法）、Batch 3（控制流/作用域）已冻结；Batch 2/4/5 部分冻结。

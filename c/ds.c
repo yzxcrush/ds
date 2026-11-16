@@ -1618,6 +1618,7 @@ typedef struct UserFn {
     int nparams;
     Node *body;
     Env *closure;
+    const char *ret_type;
 } UserFn;
 
 typedef Value *(*NativeFn)(Value **args, int nargs);
@@ -1642,6 +1643,7 @@ typedef struct Bind {
     const char *name;
     Value *val;
     int is_mut;
+    const char *type;
     struct Bind *next;
 } Bind;
 
@@ -1725,6 +1727,7 @@ static Value *v_func(Node *fn, Env *closure, const char *name) {
     v->fn->nparams = fn->nparams;
     v->fn->body = fn->a;
     v->fn->closure = closure;
+    v->fn->ret_type = fn->type_name;
     return v;
 }
 static Value *v_native(const char *name, NativeFn fn) {
@@ -1861,6 +1864,39 @@ static Value *env_get(Env *env, const char *name, int line, int col) {
     if (!b) ds_fail(line, col, "未定义的名字 `%s`", name);
     return b->val;
 }
+static int rt_int_bounds(const char *t, int64_t *lo, int64_t *hi) {
+    if (!t) return 0;
+    if (strcmp(t,"i8")==0) { *lo=-128; *hi=127; return 1; }
+    if (strcmp(t,"i16")==0) { *lo=-32768; *hi=32767; return 1; }
+    if (strcmp(t,"i32")==0) { *lo=INT32_MIN; *hi=INT32_MAX; return 1; }
+    if (strcmp(t,"i64")==0||strcmp(t,"isize")==0) { *lo=INT64_MIN; *hi=INT64_MAX; return 1; }
+    if (strcmp(t,"u8")==0) { *lo=0; *hi=255; return 1; }
+    if (strcmp(t,"u16")==0) { *lo=0; *hi=65535; return 1; }
+    if (strcmp(t,"u32")==0) { *lo=0; *hi=4294967295LL; return 1; }
+    if (strcmp(t,"u64")==0||strcmp(t,"usize")==0) { *lo=0; *hi=INT64_MAX; return 1; }
+    return 0;
+}
+static void rt_check_int(Value *v, const char *type, int line, int col, const char *what) {
+    int64_t lo, hi;
+    if (!v || v->kind != VL_INT || !rt_int_bounds(type, &lo, &hi)) return;
+    if (v->ival < lo || v->ival > hi)
+        ds_fail(line, col, "`%s` 溢出 %s：%lld 不在 [%lld, %lld]",
+                what, type, (long long)v->ival, (long long)lo, (long long)hi);
+}
+static void env_def_typed(Env *env, const char *name, Value *val, int is_mut, const char *type) {
+    Bind *b = NULL;
+    for (Bind *x = env->binds; x; x = x->next)
+        if (strcmp(x->name, name) == 0) { b = x; break; }
+    if (!b) {
+        b = (Bind *)xalloc(sizeof(Bind));
+        b->name = name;
+        b->next = env->binds;
+        env->binds = b;
+    }
+    b->val = val;
+    b->is_mut = is_mut;
+    b->type = type;
+}
 static void env_def(Env *env, const char *name, Value *val, int is_mut) {
     Bind *b = NULL;
     for (Bind *x = env->binds; x; x = x->next)
@@ -1873,11 +1909,13 @@ static void env_def(Env *env, const char *name, Value *val, int is_mut) {
     }
     b->val = val;
     b->is_mut = is_mut;
+    b->type = NULL;
 }
 static void env_assign(Env *env, const char *name, Value *val, int line, int col) {
     Bind *b = env_find(env, name);
     if (!b) ds_fail(line, col, "未定义的名字 `%s`", name);
     if (!b->is_mut) ds_fail(line, col, "`%s` 不可变，不能赋值（用 var 声明）", name);
+    rt_check_int(val, b->type, line, col, name);
     b->val = val;
 }
 
@@ -2292,7 +2330,7 @@ static Flow exec_stmt(Env *env, Node *n, Value **out_last) {
         case ND_LET: {
             Value *val = n->a ? eval(env, n->a) : v_unit();
             { Flow f = take_pending(); if (f != FLOW_NORMAL) { *out_last = v_unit(); return f; } }
-            env_def(env, n->name, val, n->bval);
+            env_def_typed(env, n->name, val, n->bval, n->type_name);
             *out_last = v_unit();
             return FLOW_NORMAL;
         }
@@ -2463,7 +2501,8 @@ static Value *call_value(Value *callee, Value **args, int nargs, int line, int c
             if (i < nargs) val = args[i];
             else if (f->params[i].def) val = eval(call_env, f->params[i].def);
             else ds_fail(line, col, "`%s` 缺少实参 `%s`", f->name, f->params[i].name);
-            env_def(call_env, f->params[i].name, val, 0);
+            rt_check_int(val, f->params[i].type, line, col, f->params[i].name);
+            env_def_typed(call_env, f->params[i].name, val, 0, f->params[i].type);
         }
         Value *last = v_unit();
         g_pending = FLOW_NORMAL;
@@ -2471,13 +2510,15 @@ static Value *call_value(Value *callee, Value **args, int nargs, int line, int c
             /* 表达式函数体：fn f(x)=x+1 */
             Value *v = eval(call_env, f->body);
             (void)take_pending();
+            rt_check_int(v, f->ret_type, line, col, f->name);
             return v;
         }
         Flow flow = exec_block(call_env, f->body, &last);
-        if (flow == FLOW_RETURN) return g_ret;
+        if (flow == FLOW_RETURN) { rt_check_int(g_ret, f->ret_type, line, col, f->name); return g_ret; }
         if (flow == FLOW_NORMAL) flow = take_pending();
-        if (flow == FLOW_RETURN) return g_ret;
+        if (flow == FLOW_RETURN) { rt_check_int(g_ret, f->ret_type, line, col, f->name); return g_ret; }
         if (flow != FLOW_NORMAL) ds_fail(line, col, "break/continue 不能跨函数");
+        rt_check_int(last, f->ret_type, line, col, f->name);
         return last;
     }
     ds_fail(line, col, "不可调用：%s", v_repr(callee));
@@ -2641,7 +2682,8 @@ static void load_module_file(const char *path, const char *ns) {
         Node *item = prog->items[i];
         if (item->kind == ND_LET) {
             Value *val = item->a ? eval(mod_env, item->a) : v_unit();
-            env_def(mod_env, item->name, val, item->bval);
+            rt_check_int(val, item->type_name, item->line, item->col, item->name);
+            env_def_typed(mod_env, item->name, val, item->bval, item->type_name);
         }
     }
     for (int i = 0; i < prog->nitems; i++) {
@@ -2691,7 +2733,8 @@ static void run_program(Node *prog, int repl_mode, Value **out_last) {
         Node *item = prog->items[i];
         if (item->kind != ND_LET) continue;
         Value *val = item->a ? eval(g_global, item->a) : v_unit();
-        env_def(g_global, item->name, val, item->bval);
+        rt_check_int(val, item->type_name, item->line, item->col, item->name);
+        env_def_typed(g_global, item->name, val, item->bval, item->type_name);
     }
     /* 最后按顺序执行顶层语句 */
     for (int i = 0; i < prog->nitems; i++) {

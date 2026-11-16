@@ -15,7 +15,7 @@
 | D4 | 无已知 critical/high blocker | ❌ B1/B2/B3 |
 | D5 | Ds+ / Cut 通过 base conformance 才能扩展 | ⏳ 未启动扩展 |
 
-**结论：当前不能打“地基完成”标签，`ds-core-v1` 不发布。**
+**结论：Base 已完成完整冻结（`ds-base-v1`）；Cut wrap / Ds+ 扩展保持不冻结。**
 
 ## 2. 扩展准入规则（硬规则）
 

@@ -2,11 +2,10 @@
 
 ## 结论
 
-**本轮冻结的是 base 已验证部分（partial-freeze），不是完整语义。**
+**Base 已完整冻结（`ds-base-v1`）。**
 
-标签：`base-partial-freeze-2026-11`。  
-已验证：77 关键字/语法、Batch 1、Batch 3、字面量范围/数组/if/位运算/`*T` 等子项。  
-未冻结：B1 固定宽度、B2 Unicode、B3 AddrSymbol。  
+标签：`ds-base-v1`。  
+已验证：77 关键字/语法、Batch 1/2/3、B1 checked、B2 base ASCII、B3 base AddrSymbol。  
 **Ds+ / Ds/Cut 不冻结**，继续独立演进并继承 base 修复。
 
 现在可以冻结的是：
@@ -37,9 +36,9 @@ Ds Base（--app）：稳定核心，只修 bug，不新增关键字
 
 | ID | 条件 | 状态 |
 |---|---|---|
-| B1 | 固定宽度整数（u8/u16/u32/i32…）+ 溢出策略统一 | ❌ |
-| B2 | Base ASCII 已冻结；Ds+/Android Unicode 扩展待做 | ⚠️ |
-| B3 | Base AddrSymbol/unsafe 检查已冻结；C 运行期/真实 MMIO 归 Cut | ⚠️ |
+| B1 | Base checked 类型化存储已统一；Cut wrap 独立 | ✅ |
+| B2 | Base ASCII 已冻结；Ds+/Android Unicode 扩展待做 | ✅ base |
+| B3 | Base AddrSymbol/unsafe 已冻结；C 运行期/真实 MMIO 归 Cut | ✅ base |
 | B4 | 真实 Thumb/AArch64 后端替代 Android 虚拟 Ds+ 验证内核 | ❌（内核阶段） |
 | B5 | 值级数组重复 `[expr; N]` 决策（支持或明确禁止） | ❌ |
 | G1 | 77 关键字校验 | ✅ |

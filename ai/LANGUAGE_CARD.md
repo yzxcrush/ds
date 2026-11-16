@@ -62,12 +62,12 @@ for i in 0..10: p f"fib({i})={fib(i)}"
 
 ## 0e. 当前验证状态（2026-11，AI 必读）
 
-**Base 语法冻结候选；语义尚未冻结**（`ds-core-v1` 未发布）。
+**Base 已完整冻结（`ds-base-v1`）**。B1 checked 整数、B2 base ASCII、B3 base AddrSymbol 已落地；Ds+/Cut 不冻结。
 
 - **已冻结批次**：Batch 1（词法/关键字/字面量/换行）、Batch 3（控制流/作用域/求值顺序）
 - **新冻结**：B2 base 侧 ASCII 标识符；B3 base 侧 AddrSymbol + `*@static` 必须 `@unsafe`
 - **部分冻结**：Batch 2（B1 固定宽度 checked 整数未完成）、Batch 4（C 运行期指针/真实 MMIO 下沉 Cut）、Batch 5（C/Android 子系统缺口）
-- **冻结标签**：`base-partial-freeze-2026-11`（partial-freeze；Ds+/Cut 不冻结）
+- **冻结标签**：`ds-base-v1`（Base 完整冻结；Ds+/Cut 不冻结）
 - **D1–D11 已锁定（全 A）**：Base/Ds+ 整数 checked、Cut wrap；Base ASCII、Unicode 属 Ds+/Android 扩展；`@static` 地址值、解引用仅 `@unsafe`/Cut；`as` 位级截断；常量溢出编译错误；`ptr[T]`/`*T` 别名；C `@static` 模拟；`[expr;N]` 不支持；Ds+/Cut 不冻结且必须继承 base checker
 - **只加不减**：难校验语义下沉 Ds+/Cut；Base 保留语法入口，不承担真实硬件/Unicode 复杂度；详见 `docs/CORE-EXTENSION-SPLIT.md`
 - **下一批**：Batch 7（仅 base 未验证项/扩展 conformance，不冻结 Ds+/Cut）
