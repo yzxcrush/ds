@@ -96,8 +96,18 @@
         "B1 fixed-width checked integers",
         "B3 C runtime/real MMIO (delegated to Cut)"
       ]
+    },
+    {
+      "id": 8,
+      "name": "B1 closure",
+      "status": "frozen",
+      "checks": [
+        "base checked storage",
+        "C/JS/Python boundaries",
+        "Cut wrap separate"
+      ]
     }
   ],
-  "next": 7,
-  "note": "base partial freeze only; Ds+/Cut not frozen"
+  "next": 9,
+  "note": "Base frozen; Ds+/Cut remain unfrozen"
 }

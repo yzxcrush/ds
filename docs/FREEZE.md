@@ -1,0 +1,75 @@
+# Ds Base 冻结策略（v0.1）
+
+## 结论
+
+**Base 已完整冻结（`ds-base-v1`）。**
+
+标签：`ds-base-v1`。  
+已验证：77 关键字/语法、Batch 1/2/3、B1 checked、B2 base ASCII、B3 base AddrSymbol。  
+**Ds+ / Ds/Cut 不冻结**，继续独立演进并继承 base 修复。
+
+现在可以冻结的是：
+
+- **77 个硬关键字**（已冻结）
+- **语法表面**：三套写法、运算符、字面量、`@` 归属
+- **base 不新增关键字**；扩展只能放到 Ds+ / Ds/Cut
+
+语义冻结必须等 B1–B3 完成，并通过门槛测试。
+
+## 三层方向
+
+```text
+Ds Base（--app）：稳定核心，只修 bug，不新增关键字
+├── Ds+（--plus，软件方向）：GC/类/并发/元编程/应用生态
+└── Ds/Cut（--cut，硬件方向）：启动/中断/MMIO/裸机/内核
+```
+
+规则：
+
+1. Base 是唯一语法与语义基线；Ds+ 和 Cut 必须是 base 的**严格超集**（Cut 仅允许硬件子集）。
+2. Ds+ 可以新增软件能力，不得改变 base 表达式/类型/控制流语义。
+3. Cut 可以新增硬件原语，不得改变 base 语义；不得把 Cut 专属语义带回 base。
+4. 任何 base 语义变更必须走 RFC，且升 major 版本；新增能力只能进扩展层。
+5. 扩展层必须通过 base 的 conformance 测试。
+
+## 冻结门槛（Semantic Freeze Gate）
+
+| ID | 条件 | 状态 |
+|---|---|---|
+| B1 | Base checked 类型化存储已统一；Cut wrap 独立 | ✅ |
+| B2 | Base ASCII 已冻结；Ds+/Android Unicode 扩展待做 | ✅ base |
+| B3 | Base AddrSymbol/unsafe 已冻结；C 运行期/真实 MMIO 归 Cut | ✅ base |
+| B4 | 真实 Thumb/AArch64 后端替代 Android 虚拟 Ds+ 验证内核 | ❌（内核阶段） |
+| B5 | 值级数组重复 `[expr; N]` 决策（支持或明确禁止） | ❌ |
+| G1 | 77 关键字校验 | ✅ |
+| G2 | Python/C/Android 负面用例一致 | ✅ |
+| G3 | base 冻结后禁止新增关键字 | ✅（策略） |
+
+机器可读状态：`spec/freeze.json`  
+检查命令：`python3 tools/freeze_check.py`
+
+完整语义冻结后版本才命名 **`ds-core-v1`**；在此之前版本继续是 `0.1.x`，不承诺完整 ABI/语义稳定。
+
+## 为什么“测试全绿”仍不能保证无 bug
+
+测试只能覆盖已想到的输入。当前已发现的问题包括：
+
+- 三端位宽不同（已修 JS 位运算）
+- 类型标注不等于运行期宽度（未修）
+- 同一 Cut 语法在 base 能 `--check` 但运行期语义不同（未修）
+- Android 的 emoji 标识符与 Python/C 不一致（未修）
+
+所以正确的承诺是：
+
+> “已知冲突已修复，且有一套可重复的回归门槛；不能承诺不存在未知 bug。”
+
+这也是冻结前必须先完成 B1–B3 的原因。
+
+## 建议的冻结顺序
+
+1. 修 B1（固定宽度/溢出）——最高优先级。
+2. 修 B3（AddrSymbol）——Cut 与 base 的边界。
+3. 定 B2（Unicode 策略）并三端同步。
+4. 补 conformance suite（正例/负例/边界/跨端差分）。
+5. 打 `ds-core-v1` 标签，base 进入只修 bug 模式。
+6. Ds+ 和 Cut 各自独立版本、独立分支，向软件/硬件延伸。

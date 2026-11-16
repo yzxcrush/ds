@@ -1,48 +1,17 @@
 {
   "name": "Ds Base Freeze Policy",
   "base_version": "0.1",
-  "status": "partial-freeze",
+  "status": "frozen",
   "syntax_frozen": true,
-  "semantics_frozen": false,
-  "can_freeze_semantics_now": false,
+  "semantics_frozen": true,
+  "can_freeze_semantics_now": true,
   "keywords": 77,
   "layers": {
     "base": "--app (Ds)",
     "software": "--plus (Ds+)",
     "hardware": "--cut (Ds/Cut)"
   },
-  "blockers": [
-    {
-      "id": "B1",
-      "title": "fixed-width integer semantics / overflow",
-      "severity": "critical",
-      "must_fix_before": "semantic-freeze"
-    },
-    {
-      "id": "B2",
-      "title": "Unicode/emoji identifier policy across drivers",
-      "severity": "high",
-      "must_fix_before": "semantic-freeze"
-    },
-    {
-      "id": "B3",
-      "title": "AddrSymbol: Cut @static vs Ds static semantics",
-      "severity": "high",
-      "must_fix_before": "semantic-freeze"
-    },
-    {
-      "id": "B4",
-      "title": "Android Ds+ virtual hardware is not real target execution",
-      "severity": "medium",
-      "must_fix_before": "kernel-validation"
-    },
-    {
-      "id": "B5",
-      "title": "value-level array repeat [expr; N] is not implemented",
-      "severity": "medium",
-      "must_fix_before": "language-completeness"
-    }
-  ],
+  "blockers": [],
   "gates": [
     "spec/keywords.json 恰好 77 项",
     "Python/C/Android 三端负面用例一致",
@@ -53,7 +22,7 @@
   ],
   "policy": "docs/FOUNDATION.md",
   "extension_freeze": false,
-  "note": "B1 仍是 critical blocker；B2 base/B3 base 检查已冻结；C 运行期/真实 MMIO 下沉 Cut",
+  "note": "Base frozen with checked integer storage; Cut wrap and Ds+ remain unfrozen",
   "batches": {
     "1": "frozen",
     "2": "partial",
@@ -80,5 +49,22 @@
   },
   "extension_policy": "additive-only; hard semantics delegated to ds+/cut",
   "b2_base": "frozen",
-  "b3_base_checker": "frozen"
+  "b3_base_checker": "frozen",
+  "freeze_tag": "ds-base-v1",
+  "b1": "base checked typed storage; cut wrap",
+  "extension_items": [
+    {
+      "id": "B4",
+      "title": "Android Ds+ virtual hardware is not real target execution"
+    },
+    {
+      "id": "B5",
+      "title": "value-level array repeat [expr;N] not implemented"
+    }
+  ],
+  "resolved": {
+    "B1": "base checked storage; Cut wrap",
+    "B2": "base ASCII frozen; Ds+/Android Unicode extension open",
+    "B3": "base AddrSymbol; C runtime/Cut MMIO delegated"
+  }
 }

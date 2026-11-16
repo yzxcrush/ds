@@ -49,18 +49,24 @@ class GotoSignal(Exception):
 # 作用域
 # ---------------------------------------------------------------------------
 class Env:
-    __slots__ = ("vars", "mutable", "parent", "cleanups", "name")
+    __slots__ = ("vars", "mutable", "types", "parent", "cleanups", "name")
 
     def __init__(self, parent: "Env | None" = None, name: str = "<scope>"):
         self.vars: dict[str, Any] = {}
         self.mutable: set[str] = set()
+        self.types: dict[str, str] = {}
         self.parent = parent
         self.cleanups: list[Any] = []
         self.name = name
 
     # -- 名字 -------------------------------------------------------------
-    def define(self, name: str, value: Any, mutable: bool = False) -> None:
+    def define(self, name: str, value: Any, mutable: bool = False,
+               type_name: str | None = None) -> None:
         self.vars[name] = value
+        if type_name:
+            self.types[name] = type_name
+        else:
+            self.types.pop(name, None)
         if mutable:
             self.mutable.add(name)
         else:
@@ -85,12 +91,21 @@ class Env:
             env = env.parent
         raise bi.DsRuntimeError(f"未定义的名字 `{name}`")
 
+    def type_of(self, name: str) -> str | None:
+        env: Env | None = self
+        while env is not None:
+            if name in env.vars:
+                return env.types.get(name)
+            env = env.parent
+        return None
+
     def assign(self, name: str, value: Any) -> None:
         env: Env | None = self
         while env is not None:
             if name in env.vars:
                 if name not in env.mutable:
                     raise bi.DsRuntimeError(f"`{name}` 不可变，不能赋值（用 var 声明）")
+                _check_typed_value(value, env.types.get(name), name)
                 env.vars[name] = value
                 return
             env = env.parent
@@ -119,6 +134,18 @@ class UnitCtx:
 # ---------------------------------------------------------------------------
 # 解释器
 # ---------------------------------------------------------------------------
+def _check_typed_value(value: Any, type_name: str | None, what: str) -> Any:
+    """B1：类型化整数的 checked 存储/参数/返回值边界。"""
+    if not type_name or type_name not in bi.INT_KINDS:
+        return value
+    if isinstance(value, bool) or not isinstance(value, int):
+        return value
+    lo, hi = bi.BUILTIN_RANGES[type_name]
+    if not (lo <= value <= hi):
+        raise bi.DsRuntimeError(f"`{what}` 溢出 {type_name}：{value} 不在 [{lo}, {hi}]")
+    return value
+
+
 class Interpreter:
     def __init__(self, *, stdout=None, bare: bool = False, gc_mode: str = "tracing",
                  rt: str = "full", target: str = "host", opt: int = 2,
@@ -432,7 +459,9 @@ class Interpreter:
     def exec_deferred_item(self, item: ast.Item, env: Env) -> None:
         if isinstance(item, ast.LetItem):
             value = self.eval_expr(item.value, env) if item.value is not None else bi.UNIT
-            env.define(item.name, value, mutable=item.mutable)
+            type_name = bi.type_name_of(item.type) if item.type is not None else None
+            _check_typed_value(value, type_name, item.name)
+            env.define(item.name, value, mutable=item.mutable, type_name=type_name)
             self.register_cleanup_if_owned(env, value)
             return
         if isinstance(item, ast.StaticDecl):
@@ -521,10 +550,12 @@ class Interpreter:
 
     def ex_let(self, stmt: ast.LetStmt, env: Env) -> Any:
         value = self.eval_expr(stmt.value, env) if stmt.value is not None else bi.UNIT
+        type_name = bi.type_name_of(stmt.type) if stmt.type is not None else None
+        _check_typed_value(value, type_name, stmt.name)
         if stmt.pattern is not None:
             self.bind_pattern(stmt.pattern, value, env, mutable=stmt.mutable)
         else:
-            env.define(stmt.name, value, mutable=stmt.mutable)
+            env.define(stmt.name, value, mutable=stmt.mutable, type_name=type_name)
         self.register_cleanup_if_owned(env, value)
         return bi.UNIT
 
@@ -1118,7 +1149,8 @@ class Interpreter:
         finally:
             scope.run_cleanups(self)
             self.depth -= 1
-        return result
+        ret_type = bi.type_name_of(decl.ret) if decl.ret is not None else None
+        return _check_typed_value(result, ret_type, decl.name)
 
     def bind_params(self, fn: bi.DsFunction, scope: Env, args: list[Any],
                     kwargs: list[tuple[str, Any]], receiver: Any) -> None:
@@ -1144,7 +1176,9 @@ class Interpreter:
                 value = self.eval_expr(param.default, scope)
             else:
                 raise bi.DsRuntimeError(f"`{decl.name}` 缺少实参 `{param.name}`")
-            scope.define(param.name, value)
+            type_name = bi.type_name_of(param.type) if param.type is not None else None
+            _check_typed_value(value, type_name, param.name)
+            scope.define(param.name, value, type_name=type_name)
         extra = args[len(params):]
         if extra:
             raise bi.DsRuntimeError(f"`{decl.name}` 实参过多（{len(args)}）")
