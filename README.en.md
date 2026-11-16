@@ -1,80 +1,117 @@
-# Ds v0.1 — a compact systems language for predictable code and AI generation
+<div align="center">
+
+<img src="docs/assets/banner.svg" alt="Ds — one language, three layers" width="100%" />
+
+# Ds
+
+**Static · explicit memory · bare metal · AI-native**
+
+`Ds/Cut ⊂ Ds Base ⊂ Ds+`
 
 [![CI](https://github.com/yzxcrush/ds/actions/workflows/spec-check.yml/badge.svg)](https://github.com/yzxcrush/ds/actions/workflows/spec-check.yml)
-[![Android APK](https://img.shields.io/badge/Android-APK-2b5278)](https://github.com/yzxcrush/ds-compiler/releases/latest)
-[![Landing page](https://img.shields.io/badge/website-yzxcrush.github.io%2Fds-64b5ef)](https://yzxcrush.github.io/ds/)
+[![Base](https://img.shields.io/github/v/release/yzxcrush/ds?label=base&color=f5c542)](https://github.com/yzxcrush/ds/releases/tag/ds-base-v1)
+[![Android](https://img.shields.io/github/v/release/yzxcrush/ds-compiler?label=android&color=2b5278)](https://github.com/yzxcrush/ds-compiler/releases/latest)
+[![Keywords](https://img.shields.io/badge/keywords-77-0d1a2f)](spec/keywords.json)
+[![License](https://img.shields.io/badge/license-MIT-0d1a2f)](LICENSE)
 
-**Ds** is a definition-first systems language: **77 hard keywords**, one semantics covering
-**app / systems / bare-metal** targets, and **three interchangeable surface syntaxes** designed to
-cut AI generation cost. It is not a re-skin of C/Java/Python/Rust/Go — its Flow syntax is built on
-juxtaposition application and `.`-terminated blocks.
+[中文](README.md) · [Quick start](#quick-start) · [Architecture](#architecture) · [Docs](#docs) · [Status](#status)
 
-> 中文文档见 [README.md](README.md)；优势阐述见 [docs/WHY-DS.md](docs/WHY-DS.md)。
+</div>
 
-## Why Ds
-
-| Strength | What it means |
-|---|---|
-| One language, three deliverables | `--app`, `--bare` (no OS/GC), 7 cross-compile targets incl. thumbv7em / riscv32 / wasm32 |
-| Two branches | **Ds** (77 frozen keywords) and **Ds+** (strict superset, 16 `@` hardware/region tokens, x86-64 subset backend) |
-| Capability density | 77 keywords cover types, memory, errors, concurrency, metaprogramming, OOP, patterns, bare-metal |
-| Token efficiency | classic 137 → concise 82 (−31%) → **Flow 69 (−49%)** on common programs |
-| Predictability | static types, explicit memory (stack/alloc/rc/arc/gc), deterministic `drop`, layered errors, structured concurrency, layout control |
-| Package manager | **dspm**: GitHub repos are packages, tags are versions, no central server; C driver natively resolves `use` |
-| AI-native | `llms.txt` + language card + 41 SFT rows + 25 benchmark tasks + auto-grader; three implementations cross-checked |
-| Not a re-skin | Flow: `\` definitions, `p "hi"` juxtaposition calls, `.` block terminators |
-
-## Three syntaxes, one AST
-
-```ds
-# classic
-package hello
-fn main() {
-    println("hello, Ds")
-}
-```
-
-```ds
-# 0.1c concise (5 tokens)
-println("hello, Ds")
-```
-
-```dsf
-# Flow (3 tokens)
-p "hello, Ds"
-```
+> **Ds Base is frozen at `ds-base-v1`.**  
+> 77 keywords, types/control flow/scopes, checked integers, ASCII identifiers and the AddrSymbol boundary are locked.  
+> Additive only from here: **Ds+ grows software, Ds/Cut grows hardware.**
 
 ## Quick start
 
-```bash
-git clone https://github.com/yzxcrush/ds && cd ds
-python3 -m unittest discover -s tests     # 158 tests
-./dscc examples/tour.ds                   # classic
-./dscc examples/concise/fib.ds            # concise
-./dscc examples/flow/fib.dsf              # Flow
-sh c/run_tests.sh                         # Python ↔ C differential tests
-./dspm install ds-hello       # package manager (GitHub as registry)
-sh c/test_dspm_use.sh                     # C driver use/dspm end-to-end
-# Ds+: git clone -b ds-plus … · docs/DS-PLUS.md
+```sh
+curl -fsSL https://raw.githubusercontent.com/yzxcrush/ds/main/install.sh | sh
+printf 'p("hello, Ds")\n' > hello.ds
+dscc hello.ds
 ```
 
-## AI learning kit
+```ds
+fn fib(n) = if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
+for i in 0..10 { p(fib(i)) }
+```
 
-- [`llms.txt`](llms.txt) · [`ai/LANGUAGE_CARD.md`](ai/LANGUAGE_CARD.md) · [`ai/llms-full.txt`](ai/llms-full.txt)
-- [`datasets/ds_sft.jsonl`](datasets/ds_sft.jsonl) · [`datasets/ds_bench.jsonl`](datasets/ds_bench.jsonl)
-- grade generated code: `python3 tools/ds_bench.py --submissions sub.jsonl --json result.json`
+## Architecture
 
-## Android compiler
+```mermaid
+flowchart TB
+    BASE["Ds Base · --app<br/>77 keywords · frozen · checked"]
+    PLUS["Ds+ · --plus<br/>software: Unicode / classes / GC / concurrency / meta"]
+    CUT["Ds/Cut · --cut<br/>hardware: wrap / MMIO / IRQ / asm / boot"]
+    OS["DsOS<br/>Cut boots · Ds+ kernel · Ds userland"]
 
-[Ds Compiler APK](https://github.com/yzxcrush/ds-compiler/releases/latest) — Telegram-style UI,
-Pydroid-like editor/console, 0.1c + Flow kernel, fully offline.
+    BASE --> PLUS
+    BASE --> CUT
+    CUT --> OS
+    PLUS --> OS
+```
 
-## Status & scope
+| Layer | Direction | Status |
+|---|---|---|
+| **Ds Base** | stable core | 🔒 `ds-base-v1` |
+| **Ds+** | software | 🔓 unfrozen, additive only |
+| **Ds/Cut** | hardware | 🔓 unfrozen, additive only |
 
-v0.1 is a **definition + reference implementations** (Python full sub-language, C core subset,
-Android kernel). No package manager, standard library ecosystem, or production tooling yet.
-See [docs/WHY-DS.md](docs/WHY-DS.md) for an honest comparison with Python/Rust/Go/C++ and when **not** to use Ds.
+## Docs
 
-## License
+| I want to… | Start here |
+|---|---|
+| Learn the language | [AI card](ai/LANGUAGE_CARD.md) · [Spec](spec/DS-v0.1.md) · [0.1c](spec/DS-CONCISE.md) · [Flow](spec/DS-FLOW.md) |
+| Write bare metal | [Ds/Cut](spec/DS-CUT.md) · [Cut compiler](cut/README.md) · [DsOS boot](dsos/) |
+| Write software | [Ds+](docs/DS-PLUS.md) · [ds-plus branch](https://github.com/yzxcrush/ds/tree/ds-plus) |
+| Manage packages | [dspm](docs/DSPM.md) · [ds-hello](https://github.com/yzxcrush/ds-hello) |
+| Read architecture | [DsOS](docs/DSOS.md) · [DSOSS](spec/DSOSS.md) · [Core split](docs/CORE-EXTENSION-SPLIT.md) |
+| Audit / freeze | [Audit](docs/AUDIT-v0.1.md) · [Freeze](docs/FREEZE.md) · [Batches](audit/batches.json) |
+| Feed an AI | [llms.txt](llms.txt) · [DS_AI_CARD](ai/DS_AI_CARD.txt) · [llms-full](ai/llms-full.txt) |
 
-Specs CC-BY-4.0, code MIT.
+## Status
+
+| Item | Status |
+|---|---|
+| Base | 🔒 `ds-base-v1` |
+| Ds+ / Ds/Cut | 🔓 unfrozen |
+| Python driver | ✅ 216 tests |
+| C driver | ✅ differential + 12 strict |
+| Cut compiler | ✅ 23 tests |
+| Ds+ compiler | ✅ 61 tests |
+| Android | ✅ 96 tests, v0.3.8 |
+| Releases | [ds-base-v1](https://github.com/yzxcrush/ds/releases/tag/ds-base-v1) · [Android](https://github.com/yzxcrush/ds-compiler/releases/latest) |
+
+```bash
+python3 -m unittest discover -s tests
+make -C c && sh c/run_tests.sh && sh c/test_strict.sh
+PYTHONPATH=cut:. python3 -m unittest discover -s cut/tests
+```
+
+## Repository map
+
+```text
+spec/       language specs (base / concise / flow / cut / DSOSS / integer)
+dsv01/      Python reference implementation
+c/          C reference implementation
+cut/        Ds/Cut compiler (Thumb / AArch64 asm)
+dsos/       boot, context switch, linker scripts
+ds-plus/    Ds+ compiler
+dsoss/      DSOSS standard and conformance checker
+dspm        GitHub-backed package manager
+audit/      batch verification / freeze state
+docs/       architecture, audit, package docs, landing page
+examples/   language examples
+```
+
+## Contributing
+
+- Run base conformance before every PR.
+- Base accepts bug fixes only; new features go to Ds+ / Cut.
+- Never remove existing base keywords or semantics.
+- Open an issue and state the target layer (Base / Ds+ / Cut).
+
+---
+
+<div align="center">
+<sub>Ds Base v1 — a quiet foundation. Built for DsOS.</sub>
+</div>

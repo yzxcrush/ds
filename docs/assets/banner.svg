@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070b14"/>
+      <stop offset="0.55" stop-color="#0d1a2f"/>
+      <stop offset="1" stop-color="#13233d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f5c542"/>
+      <stop offset="1" stop-color="#ff8a3d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="300" rx="24" fill="url(#bg)"/>
+  <g stroke="#2b4b6f" stroke-width="1" opacity="0.55">
+    <path d="M60 70 H260 V120 H420"/>
+    <path d="M60 230 H220 V180 H360"/>
+    <path d="M940 60 H1080 V110 H1140"/>
+    <path d="M900 240 H1030 V190 H1140"/>
+    <circle cx="260" cy="70" r="4" fill="#f5c542" stroke="none"/>
+    <circle cx="420" cy="120" r="4" fill="#ff8a3d" stroke="none"/>
+    <circle cx="940" cy="60" r="4" fill="#f5c542" stroke="none"/>
+    <circle cx="900" cy="240" r="4" fill="#ff8a3d" stroke="none"/>
+  </g>
+  <text x="80" y="150" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+        font-size="108" font-weight="700" fill="#f4f7fb">Ds</text>
+  <text x="86" y="190" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+        font-size="20" fill="#9fb3c8">one language · three layers</text>
+  <text x="86" y="222" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+        font-size="14" fill="#f5c542">BASE FROZEN · ds-base-v1</text>
+  <g transform="translate(760 78)">
+    <rect x="0" y="0" width="340" height="144" rx="14" fill="#0a1220" stroke="#2b4b6f"/>
+    <text x="22" y="34" font-family="ui-monospace, monospace" font-size="14" fill="#9fb3c8">Ds Base</text>
+    <text x="22" y="58" font-family="ui-monospace, monospace" font-size="12" fill="#5f7d9c">77 keywords · frozen</text>
+    <text x="22" y="88" font-family="ui-monospace, monospace" font-size="14" fill="#9fb3c8">Ds+ / Ds/Cut</text>
+    <text x="22" y="112" font-family="ui-monospace, monospace" font-size="12" fill="#5f7d9c">software / hardware</text>
+    <text x="22" y="132" font-family="ui-monospace, monospace" font-size="12" fill="#f5c542">unfrozen · additive only</text>
+  </g>
+</svg>
