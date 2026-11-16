@@ -1,7 +1,7 @@
 {
   "name": "Ds Base Freeze Policy",
   "base_version": "0.1",
-  "status": "foundation-work",
+  "status": "partial-freeze",
   "syntax_frozen": true,
   "semantics_frozen": false,
   "can_freeze_semantics_now": false,
@@ -52,15 +52,16 @@
     "base 语法冻结后只接受修 bug，不新增关键字"
   ],
   "policy": "docs/FOUNDATION.md",
-  "extension_freeze": true,
-  "note": "base semantic gate 未通过前，Ds+ 与 Ds/Cut 不新增能力",
+  "extension_freeze": false,
+  "note": "只冻结 base 已验证部分；Ds+/Cut 不冻结，继续同步 base 修复并独立演进",
   "batches": {
     "1": "frozen",
     "2": "partial",
     "3": "frozen",
     "4": "partial",
     "5": "partial",
-    "6": "queued"
+    "6": "verified-partial"
   },
-  "next_batch": 6
+  "next_batch": 7,
+  "partial_freeze_tag": "base-partial-freeze-2026-11"
 }

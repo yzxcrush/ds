@@ -67,8 +67,23 @@
     {
       "id": 6,
       "name": "cross-driver conformance/freeze",
-      "status": "queued"
+      "status": "verified-partial",
+      "verified": [
+        "77 keywords",
+        "Python 206",
+        "C differential+10",
+        "Cut 21",
+        "Cut-base check",
+        "AI kit"
+      ],
+      "blocked_by": [
+        "B1",
+        "B2",
+        "B3",
+        "C/Android subsystem gaps"
+      ]
     }
   ],
-  "next": 6
+  "next": 7,
+  "note": "base partial freeze only; Ds+/Cut not frozen"
 }

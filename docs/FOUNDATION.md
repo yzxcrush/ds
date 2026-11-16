@@ -20,13 +20,12 @@
 ## 2. 扩展准入规则（硬规则）
 
 ```text
-Base 冻结门槛未通过
+Base 已验证部分已冻结（partial-freeze）
     ↓
-禁止给 Ds+ 增加新特性
-禁止给 Ds/Cut 增加新硬件原语
-禁止修改 base 关键字/语义
+Ds+ / Ds/Cut 不冻结，可继续独立演进
+但必须继承 base 修复，并通过 base conformance
     ↓
-只允许修 B1-B3、补 conformance、修驱动 bug
+base 未验证的 B1/B2/B3 继续修，仍不发布 ds-core-v1
 ```
 
 任何扩展 PR 必须满足：
