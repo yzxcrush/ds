@@ -440,6 +440,9 @@ class Checker:
                     self.err(f"if 分支类型不一致：{a} 与 {b}", e)
                     return None
             return a or b
+        if isinstance(e, ast.LoopExpr):
+            self.check_block(e.body, self.child(scope), in_func=self.current_fn is not None)
+            return None
         if isinstance(e, ast.BlockExpr):
             return self.infer_block_value(e.block, scope)
         if isinstance(e, ast.ArrayLit):
