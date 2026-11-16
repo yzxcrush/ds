@@ -559,6 +559,13 @@ class ReturnStmt(Stmt):
 
 
 @dataclass
+class LoopExpr(Expr):
+    body: "Block" = None
+    line: int = 0
+    col: int = 0
+
+
+@dataclass
 class LabelStmt(Stmt):
     name: str = ""
     line: int = 0
@@ -731,6 +738,13 @@ class StaticDecl(Item):
     type: "TypeExpr | None" = None
     value: "Expr | None" = None
     at_addr: Any = None
+    line: int = 0
+    col: int = 0
+
+
+@dataclass
+class NopItem(Item):
+    """编译期无操作项（Cut @asm 在 base 层的兼容占位）。"""
     line: int = 0
     col: int = 0
 

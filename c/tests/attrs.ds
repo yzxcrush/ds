@@ -1,0 +1,8 @@
+# 基础层兼容 Cut 的 @ 属性拼写（@irq/@static/@asm）
+@irq fn tick() { }
+@static var g: u32 = 3
+@asm "nop"
+fn f() { @asm "nop" }
+p(g)
+tick()
+p("\x41")

@@ -136,7 +136,8 @@ def _report(exc: BaseException) -> int:
         print(f"panic: {bi.to_str(exc.value)}", file=sys.stderr)
         return EXIT_ERROR
     if isinstance(exc, bi.DsRuntimeError):
-        print(f"runtime error: {exc.msg if hasattr(exc, 'msg') else exc}", file=sys.stderr)
+        label = "type error" if getattr(exc, "check", False) else "runtime error"
+        print(f"{label}: {exc.msg if hasattr(exc, 'msg') else exc}", file=sys.stderr)
         return EXIT_ERROR
     if isinstance(exc, RecursionError):
         print("runtime error: 递归过深", file=sys.stderr)
@@ -178,7 +179,9 @@ def _run(args, cfg: dict) -> int:
     interp = _make_interp(cfg)
     try:
         if emit == "check":
-            parse_program(src, filename)
+            program = parse_program(src, filename)
+            from .checker import check_program
+            check_program(program)
             return EXIT_OK
         interp.run_source(src, filename)
     except SystemExit:

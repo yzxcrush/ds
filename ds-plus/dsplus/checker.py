@@ -5,6 +5,7 @@ from dataclasses import dataclass, fields, is_dataclass
 from typing import Any
 
 from dsv01 import ast
+from dsv01.checker import check_program as base_check_program, DsCheckError
 
 from . import ast_plus
 
@@ -128,7 +129,14 @@ class Checker:
 def check_program(prog: ast.Program, profile: str = PROFILE_COMPAT) -> list[Diagnostic]:
     if profile not in (PROFILE_BARE, PROFILE_COMPAT):
         raise ValueError(f"未知 profile: {profile}")
-    return Checker(profile).check(prog)
+    diags: list[Diagnostic] = []
+    # Ds+ 必须继承 base 语义检查；base 错误映射为 E_DS_BASE
+    try:
+        base_check_program(prog)
+    except DsCheckError as exc:
+        diags.append(Diagnostic("E_DS_BASE", exc.msg, exc.line, exc.col))
+    diags.extend(Checker(profile).check(prog))
+    return diags
 
 
 def check_raise(prog: ast.Program, profile: str = PROFILE_COMPAT) -> None:

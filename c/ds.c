@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <glob.h>
+#include <sys/stat.h>
 
 #define DS_VERSION "0.1.0"
 #define DS_MAX_MSG 1024
@@ -253,7 +255,7 @@ static void lex_source(const char *src) {
                             if (!isxdigit((unsigned char)hex[0]) || !isxdigit((unsigned char)hex[1]))
                                 ds_fail(line, (int)(p - src) - line_start + 1, "非法 \\xNN 转义");
                             out = (int)strtol(hex, NULL, 16);
-                            p += 3;
+                            p += 2;
                             break;
                         }
                         case 'u': {
@@ -461,7 +463,7 @@ enum {
     ND_IF, ND_WHILE, ND_LOOP, ND_FOR, ND_BREAK, ND_CONTINUE, ND_RETURN, ND_EXPRSTMT,
     ND_LIT_INT, ND_LIT_FLOAT, ND_LIT_STR, ND_LIT_BYTES, ND_LIT_BOOL,
     ND_ARRAY, ND_MAP, ND_VAR, ND_BINARY, ND_UNARY, ND_CALL, ND_INDEX,
-    ND_IFEXPR, ND_BLOCKEXPR, ND_LOOPEXPR
+    ND_IFEXPR, ND_BLOCKEXPR, ND_LOOPEXPR, ND_USE
 };
 
 typedef struct Node Node;
@@ -469,6 +471,7 @@ typedef struct Param {
     const char *name;
     Node *def;
     int is_mut;
+    const char *type;
 } Param;
 
 struct Node {
@@ -487,6 +490,7 @@ struct Node {
     int nkeys;
     Param *params;
     int nparams;
+    const char *type_name;   /* 返回类型/标注类型（仅基础名，供静态检查） */
 };
 
 static Node *node_new(int kind, int line, int col) {
@@ -618,6 +622,16 @@ static void skip_type(void) {
     }
 }
 
+static const char *read_type_tag(void) {
+    skip_nl();
+    Tok *t = cur();
+    const char *tag = NULL;
+    if (t->kind == TK_IDENT || t->kind == TK_KEYWORD)
+        tag = xstrndup(t->s, (size_t)t->len);
+    skip_type();
+    return tag;
+}
+
 static Node *parse_block(void);
 static Node *parse_body(void);
 static Node *parse_fstring(Tok *t);
@@ -628,6 +642,9 @@ static Node *make_var_node(const char *name, int line, int col);
 static Node *parse_expr(int min_prec);
 static Node *parse_stmt(int top_level);
 static Node *parse_fn(void);
+static Node *make_noop_stmt(int line, int col);
+static Node *parse_static_binding(Tok *at);
+static Node *parse_at_item(void);
 static Node *parse_let(int top_level);
 
 /* 本子集不支持的声明/语句：给出清晰错误（避免静默误编译） */
@@ -656,6 +673,7 @@ static Node *parse_params_and_body(Node *fn) {
     expect_punct('(', "函数参数表");
     PtrVec params = {0};
     PtrVec defaults = {0};
+    PtrVec types = {0};
     skip_nl();
     if (!is_punct(')')) {
         for (;;) {
@@ -677,9 +695,10 @@ static Node *parse_params_and_body(Node *fn) {
             if (t->kind == TK_IDENT) adv();
             skip_nl();
             Node *def = NULL;
+            const char *ptype = NULL;
             if (is_punct(':')) {
                 adv();
-                skip_type();
+                ptype = read_type_tag();
             }
             skip_nl();
             if (is_op("=")) {
@@ -688,6 +707,7 @@ static Node *parse_params_and_body(Node *fn) {
             }
             pv_push(&params, (void *)xstrdup(name));
             pv_push(&defaults, def);
+            pv_push(&types, (void *)ptype);
             (void)p_mut;
             skip_nl();
             if (is_punct(',')) { adv(); continue; }
@@ -698,7 +718,7 @@ static Node *parse_params_and_body(Node *fn) {
     skip_nl();
     if (is_kw("->")) {
         adv();
-        skip_type();
+        fn->type_name = read_type_tag();
     }
     skip_nl();
     if (is_kw("where")) {
@@ -711,9 +731,11 @@ static Node *parse_params_and_body(Node *fn) {
         fn->params[i].name = (const char *)params.items[i];
         fn->params[i].def = (Node *)defaults.items[i];
         fn->params[i].is_mut = 0;
+        fn->params[i].type = (const char *)types.items[i];
     }
     free(params.items);
     free(defaults.items);
+    free(types.items);
     if (is_op("=")) {
         adv();
         skip_nl();
@@ -762,11 +784,12 @@ static Node *parse_let(int top_level) {
     adv(); /* let / var */
     Node *n = node_new(ND_LET, t->line, t->col);
     n->name = expect_ident("变量名");
+    if (strcmp(n->name, "_") == 0) ds_fail(t->line, t->col, "`_` 不能作为变量名");
     n->bval = is_mut;
     skip_nl();
     if (is_punct(':')) {
         adv();
-        skip_type();
+        n->type_name = read_type_tag();
     }
     skip_nl();
     if (is_op("=")) {
@@ -792,6 +815,35 @@ static Node *parse_stmt(int top_level) {
         return n;
     }
     if (is_punct('{')) return parse_block();
+    if (is_kw("@")) {
+        adv();
+        skip_nl();
+        if (is_kw("asm")) {
+            adv();
+            skip_nl();
+            if (cur()->kind == TK_STR) adv();
+            else if (is_punct('(')) {
+                int depth = 1; adv();
+                while (depth > 0 && cur()->kind != TK_EOF) {
+                    if (is_punct('(')) depth++;
+                    else if (is_punct(')')) depth--;
+                    adv();
+                }
+            }
+            return make_noop_stmt(t->line, t->col);
+        }
+        if (is_kw("static")) {
+            adv(); skip_nl();
+            if (is_kw("var") || is_kw("let")) return parse_let(top_level);
+            return parse_static_binding(t);
+        }
+        if (is_kw("unsafe")) {
+            adv(); skip_nl();
+            if (is_punct('{')) return parse_block();
+            return parse_stmt(top_level);
+        }
+        ds_fail(t->line, t->col, "未知 @ 属性");
+    }
     if (is_kw("let") || is_kw("var")) return parse_let(top_level);
 
     if (is_kw("if")) return parse_if_expr();
@@ -1162,6 +1214,7 @@ static Node *parse_fn_flow(void) {
         fn->params[i].name = (const char *)names.items[i];
         fn->params[i].def = (Node *)defs.items[i];
         fn->params[i].is_mut = 0;
+        fn->params[i].type = NULL;
     }
     free(names.items);
     free(defs.items);
@@ -1303,7 +1356,12 @@ static Node *parse_primary(void) {
 static Node *parse_postfix(void) {
     Node *e = parse_primary();
     for (;;) {
+        int save_pos = P_POS;
         if (!g_flow) skip_nl();
+        if (!is_punct('(') && !is_punct('[')) {
+            if (!g_flow) P_POS = save_pos;   /* 换行在运算符前终止表达式 */
+            break;
+        }
         if (is_punct('(')) {
             Tok *t = cur();
             adv();
@@ -1398,6 +1456,113 @@ static Node *parse_expr(int min_prec) {
     return left;
 }
 
+static Node *parse_use(void) {
+    Tok *t = cur();
+    adv(); /* use */
+    skip_nl();
+    if (cur()->kind != TK_IDENT)
+        ds_fail(cur()->line, cur()->col, "use 后需要模块名");
+    Tok *p = cur();
+    char *name = xstrndup(p->s, (size_t)p->len);
+    adv();
+    while (is_op(".") && peek(1)->kind == TK_IDENT) {
+        adv();
+        Tok *part = cur();
+        name = xsprintf("%s.%s", name, xstrndup(part->s, (size_t)part->len));
+        adv();
+    }
+    Node *n = node_new(ND_USE, t->line, t->col);
+    n->name = name;
+    skip_nl();
+    if (is_kw("as")) {
+        adv();
+        skip_nl();
+        if (cur()->kind != TK_IDENT)
+            ds_fail(cur()->line, cur()->col, "as 后需要别名");
+        Tok *a = cur();
+        Node *alias = node_new(ND_LIT_STR, a->line, a->col);
+        alias->s = xstrndup(a->s, (size_t)a->len);
+        alias->slen = a->len;
+        n->a = alias;
+        adv();
+    }
+    return n;
+}
+
+
+static Node *make_noop_stmt(int line, int col) {
+    Node *lit = node_new(ND_LIT_INT, line, col);
+    lit->ival = 0;
+    Node *st = node_new(ND_EXPRSTMT, line, col);
+    st->a = lit;
+    return st;
+}
+
+static Node *parse_static_binding(Tok *at) {
+    /* Cut 形式：@static NAME: T = ADDR（没有 let/var 关键字） */
+    skip_nl();
+    const char *name = expect_ident("静态符号名");
+    Node *n = node_new(ND_LET, at->line, at->col);
+    n->name = name;
+    n->bval = 0;
+    skip_nl();
+    if (is_punct(':')) { adv(); n->type_name = read_type_tag(); }
+    skip_nl();
+    if (is_op("=")) { adv(); n->a = parse_expr(1); }
+    return n;
+}
+
+static Node *parse_at_item(void) {
+    Tok *at = cur();
+    adv(); /* @ */
+    skip_nl();
+    if (is_kw("irq")) {
+        adv();
+        if (is_punct('(')) {
+            adv();
+            int depth = 1;
+            while (depth > 0 && cur()->kind != TK_EOF) {
+                if (is_punct('(')) depth++;
+                else if (is_punct(')')) depth--;
+                adv();
+            }
+        }
+        skip_nl();
+        if (is_kw("irq")) adv();
+        skip_nl();
+        return parse_fn();
+    }
+    if (is_kw("static")) {
+        adv();
+        skip_nl();
+        if (is_kw("var") || is_kw("let")) return parse_let(1);
+        return parse_static_binding(at);
+    }
+    if (is_kw("asm")) {
+        adv();
+        skip_nl();
+        if (cur()->kind == TK_STR) adv();
+        else if (is_punct('(')) {
+            int depth = 1;
+            adv();
+            while (depth > 0 && cur()->kind != TK_EOF) {
+                if (is_punct('(')) depth++;
+                else if (is_punct(')')) depth--;
+                adv();
+            }
+        }
+        return make_noop_stmt(at->line, at->col);
+    }
+    if (is_kw("unsafe")) {
+        adv();
+        skip_nl();
+        if (is_punct('{')) return parse_block();
+        return parse_stmt(0);
+    }
+    ds_fail(at->line, at->col, "未知 @ 属性");
+    return NULL;
+}
+
 static Node *parse_program(int repl_mode) {
     P_POS = 0;
     Node *prog = node_new(ND_PROGRAM, 1, 1);
@@ -1418,8 +1583,15 @@ static Node *parse_program(int repl_mode) {
             if (cur()->kind == TK_IDENT) { adv(); }
             continue;
         }
+        /* 可见性修饰符：C 驱动不区分可见性，跳过 pub/priv/prot */
+        while (is_kw("pub") || is_kw("priv") || is_kw("prot")) {
+            adv();
+            skip_nl();
+        }
         Node *item = NULL;
         if (g_flow && cur()->kind == TK_OP && strcmp(cur()->s, "\\") == 0) item = parse_fn_flow();
+        else if (is_kw("@")) item = parse_at_item();
+        else if (is_kw("use")) item = parse_use();
         else if (is_kw("fn")) item = parse_fn();
         else if (is_kw("let") || is_kw("var")) item = parse_let(1);
         else item = parse_stmt(0);   /* 隐式入口：顶层语句 */
@@ -1690,7 +1862,9 @@ static Value *env_get(Env *env, const char *name, int line, int col) {
     return b->val;
 }
 static void env_def(Env *env, const char *name, Value *val, int is_mut) {
-    Bind *b = env_find(env, name);
+    Bind *b = NULL;
+    for (Bind *x = env->binds; x; x = x->next)
+        if (strcmp(x->name, name) == 0) { b = x; break; }   /* 只当前作用域，允许遮蔽 */
     if (!b) {
         b = (Bind *)xalloc(sizeof(Bind));
         b->name = name;
@@ -2315,10 +2489,198 @@ static Value *call_value(Value *callee, Value **args, int nargs, int line, int c
 /* ------------------------------------------------------------------ */
 static int g_had_top_stmts = 0;
 
+
+/* ---------------- dspm 包解析（C 驱动） ---------------- */
+static const char *dspm_home(void) {
+    static char buf[4096];
+    const char *e = getenv("DSPM_HOME");
+    if (e && *e) {
+        snprintf(buf, sizeof buf, "%s", e);
+    } else {
+        const char *h = getenv("HOME");
+        snprintf(buf, sizeof buf, "%s/.ds", h ? h : ".");
+    }
+    size_t n = strlen(buf);
+    while (n > 1 && buf[n - 1] == '/') buf[--n] = '\0';
+    return buf;
+}
+
+static char *read_text_file(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); return NULL; }
+    rewind(f);
+    char *buf = (char *)xalloc((size_t)sz + 1);
+    size_t got = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[got] = '\0';
+    return buf;
+}
+
+/* 极简 TOML 数组提取：key = ["a", "b"] */
+static int toml_array(const char *text, const char *key, char out[][128], int cap) {
+    const char *p = strstr(text, key);
+    if (!p) return 0;
+    p = strchr(p, '=');
+    if (!p) return 0;
+    p = strchr(p, '[');
+    if (!p) return 0;
+    p++;
+    int n = 0;
+    while (*p && *p != ']' && n < cap) {
+        if (*p == '"') {
+            p++;
+            int len = 0;
+            while (*p && *p != '"' && len < 127) {
+                if (*p == '\\' && p[1]) p++;
+                out[n][len++] = *p++;
+            }
+            out[n][len] = '\0';
+            n++;
+            if (*p == '"') p++;
+        } else {
+            p++;
+        }
+    }
+    return n;
+}
+
+static int module_targets_ok(const char *toml) {
+    char targets[32][128];
+    int n = toml_array(toml, "targets", targets, 32);
+    if (n == 0) return 1;   /* 未声明：默认 app */
+    for (int i = 0; i < n; i++) {
+        if (strcasecmp(targets[i], "ds") == 0 || strcasecmp(targets[i], "cut") == 0 ||
+            strcasecmp(targets[i], "base") == 0 || strcasecmp(targets[i], "app") == 0 ||
+            strcasecmp(targets[i], "bare") == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static int resolve_module_file(const char *module, char *out, size_t out_sz) {
+    const char *mod = strrchr(module, '.');
+    mod = mod ? mod + 1 : module;
+    char pattern[4096];
+    snprintf(pattern, sizeof pattern, "%s/pkg/*/*/ds.toml", dspm_home());
+    glob_t g;
+    memset(&g, 0, sizeof g);
+    if (glob(pattern, 0, NULL, &g) != 0) return 0;
+    int found = 0;
+    for (size_t i = 0; i < g.gl_pathc && !found; i++) {
+        char *toml = read_text_file(g.gl_pathv[i]);
+        if (!toml) continue;
+        char exports[64][128];
+        int ne = toml_array(toml, "exports", exports, 64);
+        int match = (ne == 0);
+        for (int j = 0; j < ne; j++)
+            if (strcasecmp(exports[j], mod) == 0) { match = 1; break; }
+        if (!match || !module_targets_ok(toml)) { continue; }
+        char pkgdir[4096];
+        snprintf(pkgdir, sizeof pkgdir, "%s", g.gl_pathv[i]);
+        char *slash = strrchr(pkgdir, '/');
+        if (slash) *slash = '\0';
+        const char *modname = (ne > 0 && strcasecmp(exports[0], mod) == 0) ? exports[0] : mod;
+        static const char *fmts[] = {"%s/src/%s.ds", "%s/src/%s.dsf", "%s/%s.ds", NULL};
+        for (int k = 0; fmts[k] && !found; k++) {
+            char cand[4096];
+            snprintf(cand, sizeof cand, fmts[k], pkgdir, modname);
+            if (access(cand, R_OK) == 0) {
+                snprintf(out, out_sz, "%s", cand);
+                found = 1;
+            }
+        }
+    }
+    globfree(&g);
+    return found;
+}
+
+static void load_module_file(const char *path, const char *ns) {
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] load %s as %s\n", path, ns);
+    static char loaded[256][256];
+    static int nloaded = 0;
+    for (int i = 0; i < nloaded; i++)
+        if (strcmp(loaded[i], ns) == 0) return;
+    if (nloaded >= 256)
+        ds_fail(1, 1, "模块加载层数超过上限");
+    int save_flow = g_flow;
+    Tok *save_toks = g_toks;
+    int save_n = g_ntoks, save_cap = g_captoks, save_pos = P_POS;
+    char *src = read_text_file(path);
+    if (!src) ds_fail(1, 1, "无法读取模块：%s", path);
+    setup_flow(path, src);
+    g_ntoks = 0;       /* 关键：重置 token 计数，避免复用外层 token */
+    lex_source(src);
+    P_POS = 0;
+    Node *prog = parse_program(0);
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] parsed %s items=%d\n", ns, prog->nitems);
+    /* 模块内的 use 先加载 */
+    for (int i = 0; i < prog->nitems; i++)
+        if (prog->items[i]->kind == ND_USE) {
+            Node *u = prog->items[i];
+            char target[4096];
+            if (!resolve_module_file(u->name, target, sizeof target))
+                ds_fail(u->line, u->col,
+                        "找不到模块 `%s`；请运行 `dspm install <user>/<repo>`（DSPM_HOME=%s）",
+                        u->name, dspm_home());
+            const char *child_ns = u->a ? u->a->s : u->name;
+            const char *dot = strrchr(u->name, '.');
+            if (!u->a && dot) child_ns = dot + 1;
+            load_module_file(target, child_ns);
+        }
+    Env *mod_env = env_new(g_global);
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] mod_env %s\n", ns);
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *fn = prog->items[i];
+        if (fn->kind == ND_FN)
+            env_def(mod_env, fn->name, v_func(fn, mod_env, fn->name), 0);
+    }
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *item = prog->items[i];
+        if (item->kind == ND_LET) {
+            Value *val = item->a ? eval(mod_env, item->a) : v_unit();
+            env_def(mod_env, item->name, val, item->bval);
+        }
+    }
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *fn = prog->items[i];
+        if (fn->kind == ND_FN) {
+            char *exposed = xsprintf("%s.%s", ns, fn->name);
+            env_def(g_global, exposed, v_func(fn, mod_env, fn->name), 0);
+        }
+    }
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] exported %s\n", ns);
+    snprintf(loaded[nloaded], sizeof loaded[nloaded], "%s", ns);
+    nloaded++;
+    g_flow = save_flow;
+    g_toks = save_toks;
+    g_ntoks = save_n;
+    g_captoks = save_cap;
+    P_POS = save_pos;
+}
+
+static void load_use_item(Node *item) {
+    if (getenv("DSPM_DEBUG")) fprintf(stderr, "[dspm] use %s\n", item->name);
+    char path[4096];
+    if (!resolve_module_file(item->name, path, sizeof path))
+        ds_fail(item->line, item->col,
+                "找不到模块 `%s`；请运行 `dspm install <user>/<repo>`（DSPM_HOME=%s）",
+                item->name, dspm_home());
+    const char *ns = item->a ? item->a->s : item->name;
+    const char *dot = strrchr(item->name, '.');
+    if (!item->a && dot) ns = dot + 1;
+    load_module_file(path, ns);
+}
+
 static void run_program(Node *prog, int repl_mode, Value **out_last) {
     Value *last = v_unit();
     g_had_top_stmts = 0;
-    /* 先注册所有函数（隐式入口允许函数在语句之后定义） */
+    /* 先解析 use（dspm 包） */
+    for (int i = 0; i < prog->nitems; i++)
+        if (prog->items[i]->kind == ND_USE) load_use_item(prog->items[i]);
+    /* 再注册所有函数（隐式入口允许函数在语句之后定义） */
     for (int i = 0; i < prog->nitems; i++) {
         Node *item = prog->items[i];
         if (item->kind == ND_FN)
@@ -2334,7 +2696,8 @@ static void run_program(Node *prog, int repl_mode, Value **out_last) {
     /* 最后按顺序执行顶层语句 */
     for (int i = 0; i < prog->nitems; i++) {
         Node *item = prog->items[i];
-        if (item->kind == ND_FN || item->kind == ND_LET || item->kind == ND_PACKAGE) continue;
+        if (item->kind == ND_FN || item->kind == ND_LET || item->kind == ND_PACKAGE ||
+            item->kind == ND_USE) continue;
         g_pending = FLOW_NORMAL;
         g_had_top_stmts = 1;
         Value *stmt_val = v_unit();
@@ -2401,6 +2764,300 @@ static void dump_tokens(void) {
 }
 
 /* 返回 0 成功；非 0 表示解析/运行错误（错误信息已打印）。 */
+
+/* ------------------------------------------------------------------ */
+/* 静态语义检查（明显非法代码在 C 驱动里也必须在执行前拒绝）            */
+/* ------------------------------------------------------------------ */
+typedef struct { const char *name; const char *type; } TypeBind;
+typedef struct { TypeBind *items; int len; } TypeEnv;
+
+static void te_set(TypeEnv *env, const char *name, const char *type) {
+    for (int i = env->len - 1; i >= 0; i--) {
+        if (strcmp(env->items[i].name, name) == 0) { env->items[i].type = type; return; }
+    }
+    env->items = (TypeBind *)realloc(env->items, sizeof(TypeBind) * (size_t)(env->len + 1));
+    env->items[env->len].name = name;
+    env->items[env->len].type = type;
+    env->len++;
+}
+static const char *te_get(TypeEnv *env, const char *name) {
+    for (int i = env->len - 1; i >= 0; i--)
+        if (strcmp(env->items[i].name, name) == 0) return env->items[i].type;
+    return NULL;
+}
+static int sem_is_int(const char *t) {
+    if (!t) return 0;
+    return strcmp(t,"i8")==0||strcmp(t,"i16")==0||strcmp(t,"i32")==0||
+           strcmp(t,"i64")==0||strcmp(t,"u8")==0||strcmp(t,"u16")==0||
+           strcmp(t,"u32")==0||strcmp(t,"u64")==0||strcmp(t,"isize")==0||
+           strcmp(t,"usize")==0||strcmp(t,"int")==0||strcmp(t,"intlit")==0;
+}
+static int sem_is_unit(const char *t) {
+    return !t || strcmp(t,"unit")==0 || strcmp(t,"void")==0;
+}
+static int sem_compat(const char *actual, const char *expected) {
+    if (!actual || !expected) return 1;
+    if (sem_is_unit(expected)) return sem_is_unit(actual) || strcmp(actual,"?")==0;
+    if (sem_is_int(expected)) {
+        if (!sem_is_int(actual)) return 0;
+        if (strcmp(actual,"intlit")==0) return 1;
+        return strcmp(actual, expected) == 0;
+    }
+    if (strcmp(expected,"f32")==0||strcmp(expected,"f64")==0) return strcmp(actual,"float")==0;
+    if (strcmp(expected,"bool")==0) return strcmp(actual,"bool")==0;
+    if (strcmp(expected,"str")==0) return strcmp(actual,"str")==0;
+    if (expected[0]=='[') return strcmp(actual,"array")==0;
+    return 1; /* 未知/复合类型：保守放行 */
+}
+
+static int sem_int_bounds(const char *t, int64_t *lo, int64_t *hi) {
+    if (!t) return 0;
+    if (strcmp(t,"i8")==0) { *lo=-128; *hi=127; return 1; }
+    if (strcmp(t,"i16")==0) { *lo=-32768; *hi=32767; return 1; }
+    if (strcmp(t,"i32")==0) { *lo=INT32_MIN; *hi=INT32_MAX; return 1; }
+    if (strcmp(t,"i64")==0||strcmp(t,"isize")==0) { *lo=INT64_MIN; *hi=INT64_MAX; return 1; }
+    if (strcmp(t,"u8")==0) { *lo=0; *hi=255; return 1; }
+    if (strcmp(t,"u16")==0) { *lo=0; *hi=65535; return 1; }
+    if (strcmp(t,"u32")==0) { *lo=0; *hi=4294967295LL; return 1; }
+    if (strcmp(t,"u64")==0||strcmp(t,"usize")==0) { *lo=0; *hi=INT64_MAX; return 1; }
+    return 0;
+}
+static int sem_const_int(const Node *e, int64_t *out) {
+    if (!e) return 0;
+    if (e->kind == ND_LIT_INT) { *out = e->ival; return 1; }
+    if (e->kind == ND_UNARY && e->name && strcmp(e->name, "-") == 0 &&
+        e->a && e->a->kind == ND_LIT_INT) { *out = -e->a->ival; return 1; }
+    if (e->kind == ND_BINARY && e->a && e->b && e->name) {
+        int64_t a, b;
+        if (!sem_const_int(e->a, &a) || !sem_const_int(e->b, &b)) return 0;
+        if (strcmp(e->name, "+") == 0) { *out = a + b; return 1; }
+        if (strcmp(e->name, "-") == 0) { *out = a - b; return 1; }
+        if (strcmp(e->name, "*") == 0) { *out = a * b; return 1; }
+    }
+    return 0;
+}
+static int sem_lit_int_fits(const Node *lit, const char *type) {
+    int64_t lo, hi, v;
+    if (!lit || !sem_int_bounds(type, &lo, &hi)) return 1;
+    if (!sem_const_int(lit, &v)) return 1;
+    return v >= lo && v <= hi;
+}
+static void sem_fail(Node *n, const char *msg) { ds_fail(n->line, n->col, "%s", msg); }
+
+static const char *sem_find_ret(Node *prog, const char *name) {
+    if (!prog || prog->kind != ND_PROGRAM) return NULL;
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *it = prog->items[i];
+        if (it->kind == ND_FN && strcmp(it->name, name) == 0) return it->type_name;
+    }
+    return NULL;
+}
+static const char *sem_infer(Node *e, TypeEnv *env, Node *prog);
+static const char *sem_block_tail(Node *block, TypeEnv *env, Node *prog) {
+    if (!block || block->kind != ND_BLOCK) return NULL;
+    const char *last = NULL;
+    for (int i = 0; i < block->nitems; i++) {
+        Node *st = block->items[i];
+        if (st->kind == ND_EXPRSTMT) last = sem_infer(st->a, env, prog);
+        else if (st->kind == ND_IFEXPR) last = sem_infer(st, env, prog);
+        else last = NULL;
+        if ((st->kind == ND_EXPRSTMT || st->kind == ND_IFEXPR) && !last) last = "?";
+    }
+    return last;
+}
+static const char *sem_infer(Node *e, TypeEnv *env, Node *prog) {
+    if (!e) return "unit";
+    switch (e->kind) {
+        case ND_LIT_INT: return "intlit";
+        case ND_LIT_FLOAT: return "float";
+        case ND_LIT_STR: return "str";
+        case ND_LIT_BYTES: return "bytes";
+        case ND_LIT_BOOL: return "bool";
+        case ND_ARRAY: {
+            const char *base = NULL;
+            for (int i = 0; i < e->nitems; i++) {
+                const char *t = sem_infer(e->items[i], env, prog);
+                if (!t || strcmp(t, "?") == 0) continue;
+                if (strcmp(t, "intlit") == 0) t = "i32";
+                if (!base) base = t;
+                else if (strcmp(base, t) != 0)
+                    sem_fail(e, "数组元素类型不一致（无隐式提升）");
+            }
+            return "array";
+        }
+        case ND_MAP: return "map";
+        case ND_VAR: return te_get(env, e->name);
+        case ND_UNARY: return e->name && strcmp(e->name,"!")==0 ? "bool" : sem_infer(e->a, env, prog);
+        case ND_BINARY: {
+            const char *op = e->name ? e->name : "";
+            if (strcmp(op,"==")==0||strcmp(op,"!=")==0||strcmp(op,"<")==0||
+                strcmp(op,">")==0||strcmp(op,"<=")==0||strcmp(op,">=")==0||
+                strcmp(op,"&&")==0||strcmp(op,"||")==0) return "bool";
+            const char *a = sem_infer(e->a, env, prog), *b = sem_infer(e->b, env, prog);
+            if (strcmp(op,"+")==0 && ((a&&strcmp(a,"str")==0)||(b&&strcmp(b,"str")==0))) return "str";
+            if ((a&&strcmp(a,"float")==0)||(b&&strcmp(b,"float")==0)) return "float";
+            if (sem_is_int(a) && sem_is_int(b)) {
+                if (strcmp(a,"intlit")==0 && strcmp(b,"intlit")==0) return "intlit";
+                if (strcmp(a,"intlit")==0) return b;
+                if (strcmp(b,"intlit")==0) return a;
+                if (strcmp(a,b)==0) return a;
+                return NULL;
+            }
+            return NULL;
+        }
+        case ND_CALL: {
+            for (int i = 0; i < e->nitems; i++) sem_infer(e->items[i], env, prog);
+            if (!e->a || e->a->kind != ND_VAR) return NULL;
+            const char *n = e->a->name;
+            if (strcmp(n,"p")==0||strcmp(n,"println")==0||strcmp(n,"print")==0) return "unit";
+            if (strcmp(n,"str")==0) return "str";
+            if (strcmp(n,"len")==0) return "int";
+            if (strcmp(n,"range")==0) return "array";
+            return sem_find_ret(prog, n);
+        }
+        case ND_IFEXPR: {
+            const char *a = (e->b && e->b->kind==ND_BLOCK) ? sem_block_tail(e->b, env, prog) : NULL;
+            const char *b = (e->c && e->c->kind==ND_BLOCK) ? sem_block_tail(e->c, env, prog) :
+                            (e->c ? sem_infer(e->c, env, prog) : NULL);
+            if (a && b) {
+                if (strcmp(a,"intlit")==0 && sem_is_int(b)) a = b;
+                else if (strcmp(b,"intlit")==0 && sem_is_int(a)) b = a;
+                if (strcmp(a,b)!=0) sem_fail(e, "if 分支类型不一致");
+                return a;
+            }
+            return NULL;
+        }
+        case ND_BLOCKEXPR: return sem_block_tail(e->b, env, prog);
+        default: return NULL;
+    }
+}
+static void sem_check_stmt(Node *st, TypeEnv *env, Node *prog, const char *ret,
+                           int in_fn, int loop_depth, int *has_return);
+static void sem_check_block(Node *block, TypeEnv *env, Node *prog, const char *ret,
+                            int in_fn, int loop_depth, int *has_return) {
+    if (!block || block->kind != ND_BLOCK) return;
+    for (int i = 0; i < block->nitems; i++)
+        sem_check_stmt(block->items[i], env, prog, ret, in_fn, loop_depth, has_return);
+}
+static void sem_check_cond(Node *cond, TypeEnv *env, Node *prog, Node *at) {
+    const char *t = sem_infer(cond, env, prog);
+    if (t && strcmp(t,"bool")!=0 && strcmp(t,"?")!=0)
+        sem_fail(at, "条件必须是 bool");
+}
+static void sem_check_stmt(Node *st, TypeEnv *env, Node *prog, const char *ret,
+                           int in_fn, int loop_depth, int *has_return) {
+    if (!st) return;
+    switch (st->kind) {
+        case ND_LET: {
+            const char *actual = sem_infer(st->a, env, prog);
+            if (st->type_name && !sem_lit_int_fits(st->a, st->type_name))
+                ds_fail(st->line, st->col, "`%s` 字面量超出 %s 范围", st->name, st->type_name);
+            if (st->type_name && !sem_compat(actual, st->type_name))
+                ds_fail(st->line, st->col, "`%s` 类型不匹配：标注 %s，实际 %s",
+                        st->name, st->type_name, actual ? actual : "?");
+            te_set(env, st->name, st->type_name ? st->type_name :
+                   (actual && strcmp(actual,"intlit")==0 ? "i32" : actual));
+            return;
+        }
+        case ND_ASSIGN: {
+            const char *actual = sem_infer(st->b, env, prog);
+            if (st->a && st->a->kind == ND_VAR) {
+                const char *tt = te_get(env, st->a->name);
+                if (tt && actual && !sem_compat(actual, tt))
+                    ds_fail(st->line, st->col, "赋值类型不匹配：目标 %s，值 %s", tt, actual);
+            }
+            return;
+        }
+        case ND_RETURN:
+            if (!in_fn) sem_fail(st, "`return` 只能出现在函数内");
+            if (has_return) *has_return = 1;
+            if (st->a) {
+                const char *actual = sem_infer(st->a, env, prog);
+                if (!sem_is_unit(ret) && !sem_compat(actual, ret))
+                    ds_fail(st->line, st->col, "`return` 类型不匹配：期望 %s，实际 %s",
+                            ret, actual ? actual : "?");
+            } else if (!sem_is_unit(ret)) {
+                sem_fail(st, "函数声明返回类型，`return` 需要值");
+            }
+            return;
+        case ND_IFEXPR:
+            sem_check_cond(st->a, env, prog, st);
+            if (st->b) sem_check_block(st->b, env, prog, ret, in_fn, loop_depth, has_return);
+            if (st->c) sem_check_stmt(st->c, env, prog, ret, in_fn, loop_depth, has_return);
+            return;
+        case ND_BLOCK:
+            sem_check_block(st, env, prog, ret, in_fn, loop_depth, has_return);
+            return;
+        case ND_WHILE:
+            sem_check_cond(st->a, env, prog, st);
+            sem_check_block(st->b, env, prog, ret, in_fn, loop_depth + 1, has_return);
+            return;
+        case ND_LOOP:
+            sem_check_block(st->b, env, prog, ret, in_fn, loop_depth + 1, has_return);
+            return;
+        case ND_FOR:
+            sem_infer(st->a, env, prog);
+            sem_check_block(st->b, env, prog, ret, in_fn, loop_depth + 1, has_return);
+            return;
+        case ND_BREAK:
+        case ND_CONTINUE:
+            if (loop_depth <= 0) sem_fail(st, "`break`/`continue` 只能出现在循环内");
+            return;
+        case ND_EXPRSTMT:
+            sem_infer(st->a, env, prog);
+            return;
+        default:
+            sem_infer(st, env, prog);
+    }
+}
+static void sem_check_fn(Node *fn, Node *prog) {
+    const char *ret = fn->type_name;
+    if (ret && strcmp(ret,"void")==0) ret = "unit";
+    TypeEnv env = {0};
+    for (int i = 0; i < fn->nparams; i++)
+        te_set(&env, fn->params[i].name, fn->params[i].type);
+    int has_return = 0;
+    if (fn->a && fn->a->kind == ND_BLOCK) {
+        sem_check_block(fn->a, &env, prog, ret, 1, 0, &has_return);
+        const char *tail = sem_block_tail(fn->a, &env, prog);
+        if (tail && strcmp(tail,"?")!=0 && !sem_is_unit(ret) && !sem_compat(tail, ret))
+            ds_fail(fn->line, fn->col, "函数 `%s` 返回类型不匹配：期望 %s，尾表达式为 %s",
+                    fn->name, ret, tail);
+        if (!sem_is_unit(ret) && !has_return && !tail)
+            ds_fail(fn->line, fn->col, "函数 `%s` 声明返回 %s，但没有 return 或尾表达式",
+                    fn->name, ret);
+    } else if (fn->a) {
+        const char *actual = sem_infer(fn->a, &env, prog);
+        if (!sem_is_unit(ret) && !sem_compat(actual, ret))
+            ds_fail(fn->line, fn->col, "函数 `%s` 返回类型不匹配：期望 %s，实际 %s",
+                    fn->name, ret, actual ? actual : "?");
+    } else if (!sem_is_unit(ret)) {
+        ds_fail(fn->line, fn->col, "函数 `%s` 没有函数体", fn->name);
+    }
+    free(env.items);
+}
+static void check_semantics(Node *prog) {
+    if (!prog || prog->kind != ND_PROGRAM) return;
+    TypeEnv top = {0};
+    for (int i = 0; i < prog->nitems; i++) {
+        Node *it = prog->items[i];
+        if (it->kind == ND_FN) sem_check_fn(it, prog);
+        else if (it->kind == ND_LET) {
+            const char *actual = sem_infer(it->a, &top, prog);
+            if (it->type_name && !sem_lit_int_fits(it->a, it->type_name))
+                ds_fail(it->line, it->col, "`%s` 字面量超出 %s 范围", it->name, it->type_name);
+            if (it->type_name && !sem_compat(actual, it->type_name))
+                ds_fail(it->line, it->col, "`%s` 类型不匹配：标注 %s，实际 %s",
+                        it->name, it->type_name, actual ? actual : "?");
+            te_set(&top, it->name, it->type_name ? it->type_name :
+                   (actual && strcmp(actual,"intlit")==0 ? "i32" : actual));
+        } else {
+            sem_check_stmt(it, &top, prog, NULL, 0, 0, NULL);
+        }
+    }
+    free(top.items);
+}
+
 static int run_text(const char *src, const char *file, int repl_mode, int dump, int check_mode) {
     if (setjmp(g_err)) {
         fprintf(stderr, "error: %s\n", g_errmsg);
@@ -2416,6 +3073,7 @@ static int run_text(const char *src, const char *file, int repl_mode, int dump, 
     }
     P_POS = 0;
     Node *prog = parse_program(repl_mode);
+    check_semantics(prog);
     if (check_mode) return 0;
     Value *last = v_unit();
     run_program(prog, repl_mode, &last);

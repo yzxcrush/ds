@@ -314,6 +314,14 @@ class Parser:
             return t.text
         self.error(f"期望名字，得到 {t.text!r}", t)
 
+    def parse_binding_name(self, what="变量名") -> str:
+        """变量绑定名：硬关键字不能作标识符（`new`/`drop` 只用于方法）。"""
+        t = self.tok
+        if t.kind not in (IDENT, RAW_IDENT):
+            self.error(f"期望{what}，得到 {t.text!r}", t)
+        self.advance()
+        return t.text
+
     # ------------------------------------------------------------------
     # 顶层
     # ------------------------------------------------------------------
@@ -415,6 +423,19 @@ class Parser:
             self.advance()
             self.skip_nl()
         t = self.tok
+        if "asm" in attrs and t.kind in (STRING,):
+            self.advance()
+            self.skip_nl()
+            if self.at_punct("("):
+                depth = 1
+                self.advance()
+                while depth > 0 and not self.at_eof():
+                    if self.at_punct("("): depth += 1
+                    elif self.at_punct(")"): depth -= 1
+                    self.advance()
+            return ast.NopItem(line=line, col=col)
+        if "static" in attrs and t.kind in (IDENT, RAW_IDENT):
+            return self.parse_static_binding(attrs, line, col)
         if self.flow and t.kind == OP and t.text == "\\":
             fn = self.parse_fn_flow()
             fn.vis = vis
@@ -496,7 +517,7 @@ class Parser:
         mutable = self.tok.text == "var"
         self.advance()
         self.skip_nl()
-        name = self.parse_name()
+        name = self.parse_binding_name()
         ty = None
         value = None
         if self.at_punct(":"):
@@ -955,6 +976,17 @@ class Parser:
             at_addr=at_addr, vis=vis, attrs=attrs, line=line, col=col,
         )
 
+    def parse_static_binding(self, attrs, line, col) -> ast.StaticDecl:
+        name = self.parse_name()
+        ty = None
+        value = None
+        if self.at_punct(":"):
+            self.advance(); self.skip_nl(); ty = self.parse_type()
+        if self.at_sym("="):
+            self.advance(); self.skip_nl(); value = self.parse_expr()
+        return ast.StaticDecl(name=name, mutable=False, type=ty, value=value,
+                              at_addr=value, attrs=attrs, line=line, col=col)
+
     def parse_extern_decl(self, vis, attrs, line, col) -> ast.ExternDecl:
         self.expect_kw("extern")
         self.skip_nl()
@@ -1311,6 +1343,18 @@ class Parser:
     def parse_stmt(self) -> ast.Stmt:
         t = self.tok
         line, col = t.line, t.col
+        if self.at_kw("@") and self.peek_sig(1).text == "asm":
+            self.advance(); self.advance()
+            self.skip_nl()
+            if self.tok.kind == STRING:
+                self.advance()
+            elif self.at_punct("("):
+                depth = 1; self.advance()
+                while depth > 0 and not self.at_eof():
+                    if self.at_punct("("): depth += 1
+                    elif self.at_punct(")"): depth -= 1
+                    self.advance()
+            return ast.ExprStmt(expr=ast.Lit(value=None, line=line, col=col), line=line, col=col)
         if self.flow and t.kind == OP and t.text == "?":
             return self.parse_flow_if(as_stmt=True)
         if self.flow and t.kind == OP and t.text == "^":
@@ -1616,6 +1660,11 @@ class Parser:
         self.skip_nl()
         t = self.tok
         line, col = t.line, t.col
+        if t.kind == OP and t.text == "*":
+            # Cut 指针类型 *T：base 类型系统用 PtrType 承载
+            self.advance()
+            self.skip_nl()
+            return ast.PtrType(inner=self.parse_type(), line=line, col=col)
         if t.kind == BLANK:
             self.advance()
             return ast.InferredType(line=line, col=col)
@@ -2116,6 +2165,10 @@ class Parser:
                 return ast.Var(name="recover", line=line, col=col)
             if kw == "if":
                 return self.parse_if()
+            if kw == "loop":
+                self.advance()
+                self.skip_nl()
+                return ast.LoopExpr(body=self.parse_body(), line=line, col=col)
             if kw == "match":
                 return self.parse_match()
             if kw == "spawn":
