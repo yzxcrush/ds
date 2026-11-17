@@ -73,7 +73,7 @@ flowchart TB
 | 你想…… | 从这里开始 |
 |---|---|
 | 学语言 | [AI 语言卡](ai/LANGUAGE_CARD.md) · [完整规范](spec/DS-v0.1.md) · [0.1c](spec/DS-CONCISE.md) · [Flow](spec/DS-FLOW.md) |
-| 写裸机 | [Ds/Cut 规范](spec/DS-CUT.md) · [Cut 编译器](cut/README.md) · [启动/链接脚本](dsos/) |
+| 写裸机 | [Ds/Cut 规范](spec/DS-CUT.md) · [Cut 编译器](cut/README.md) · [启动/链接脚本](dsos/) · [Step 1 机器码](dsos/toolchain/step1/README.md) |
 | 写软件 | [Ds+ 一页纸](docs/DS-PLUS.md) · [Ds+ 分支](https://github.com/yzxcrush/ds/tree/ds-plus) |
 | 用包管理 | [dspm 规范](docs/DSPM.md) · [ds-hello 示例包](https://github.com/yzxcrush/ds-hello) |
 | 看架构 | [DsOS](docs/DSOS.md) · [DSOSS 标准](spec/DSOSS.md) · [核心/扩展分层](docs/CORE-EXTENSION-SPLIT.md) |
