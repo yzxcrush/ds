@@ -19,6 +19,7 @@ class Machine:
         self.exit_code: int | None = None
         self.steps = 0
         self.outputs: list[bytes] = []
+        self.flags = {"eq": False, "lt": False}
 
     def idx(self, addr: int) -> int:
         if addr < BASE or addr >= BASE + MEM_SIZE:
@@ -72,7 +73,48 @@ class Machine:
         if rip < 0 or rip >= len(m):
             raise DsOSError(f"rip out of range 0x{rip:x}")
         b = m[rip]
-        if b == 0x55:                     # push rbp
+        if b == 0x50:                     # push rax
+            self.push(self.r["rax"]); self.r["rip"] = rip + 1
+        elif b == 0x59:                   # pop rcx
+            self.r["rcx"] = self.pop(); self.r["rip"] = rip + 1
+        elif m[rip:rip + 3] == b"\x48\x01\xc8":  # add rax, rcx
+            self.r["rax"] = (self.r["rax"] + self.r["rcx"]) & 0xFFFFFFFFFFFFFFFF; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x48\x29\xc1":  # sub rcx, rax
+            self.r["rcx"] = (self.r["rcx"] - self.r["rax"]) & 0xFFFFFFFFFFFFFFFF; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x48\x89\xc8":  # mov rax, rcx
+            self.r["rax"] = self.r["rcx"]; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x48\xf7\xd8":  # neg rax
+            self.r["rax"] = (-self.r["rax"]) & 0xFFFFFFFFFFFFFFFF; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x48\x39\xc1":  # cmp rcx, rax
+            a, b2 = self.r["rcx"], self.r["rax"]
+            self.flags["eq"] = a == b2; self.flags["lt"] = a < b2; self.r["rip"] = rip + 3
+        elif m[rip:rip + 4] == b"\x48\x83\xf8\x00":  # cmp rax, 0
+            self.flags["eq"] = self.r["rax"] == 0; self.flags["lt"] = self.r["rax"] < 0; self.r["rip"] = rip + 4
+        elif m[rip:rip + 3] == b"\x0f\x94\xc0":  # sete al
+            self.r["rax"] = 1 if self.flags["eq"] else 0; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x0f\x95\xc0":  # setne al
+            self.r["rax"] = 0 if self.flags["eq"] else 1; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x0f\x9c\xc0":  # setl al
+            self.r["rax"] = 1 if self.flags["lt"] else 0; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x0f\x9f\xc0":  # setg al
+            self.r["rax"] = 1 if (not self.flags["lt"] and not self.flags["eq"]) else 0; self.r["rip"] = rip + 3
+        elif m[rip:rip + 3] == b"\x0f\xb6\xc0":  # movzx eax, al
+            self.r["rax"] &= 0xFF; self.r["rip"] = rip + 3
+        elif m[rip:rip + 2] == b"\x0f\x84":     # je rel32
+            rel = struct.unpack_from("<i", m, rip + 2)[0]
+            self.r["rip"] = (rip + 6 + rel) if self.flags["eq"] else rip + 6
+        elif m[rip:rip + 2] == b"\x0f\x85":     # jne
+            rel = struct.unpack_from("<i", m, rip + 2)[0]
+            self.r["rip"] = (rip + 6 + rel) if not self.flags["eq"] else rip + 6
+        elif m[rip:rip + 2] == b"\x0f\x8c":     # jl
+            rel = struct.unpack_from("<i", m, rip + 2)[0]
+            self.r["rip"] = (rip + 6 + rel) if self.flags["lt"] else rip + 6
+        elif m[rip:rip + 2] == b"\x0f\x8f":     # jg
+            rel = struct.unpack_from("<i", m, rip + 2)[0]
+            self.r["rip"] = (rip + 6 + rel) if (not self.flags["lt"] and not self.flags["eq"]) else rip + 6
+        elif b == 0xE9:                   # jmp rel32
+            rel = struct.unpack_from("<i", m, rip + 1)[0]; self.r["rip"] = rip + 5 + rel
+        elif b == 0x55:                     # push rbp
             self.push(self.r["rbp"]); self.r["rip"] = rip + 1
         elif m[rip:rip + 3] == b"\x48\x89\xe5":  # mov rbp,rsp
             self.r["rbp"] = self.r["rsp"]; self.r["rip"] = rip + 3

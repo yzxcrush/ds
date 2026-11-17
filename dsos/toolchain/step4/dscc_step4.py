@@ -44,7 +44,9 @@ class Compiler:
         self.code = bytearray()
         self.labels: dict[str, int] = {}
         self.fixups: list[tuple[int, str]] = []
+        self.jumps: list[tuple[int, str, int]] = []  # (disp_pos, label, opcode bytes len)
         self.meta: dict[str, FnMeta] = {}
+        self.serial = 0
         self.fns = {i.name: i for i in prog.items if isinstance(i, ast.FnDecl)}
 
     def scan(self, fn: ast.FnDecl) -> FnMeta:
@@ -60,6 +62,18 @@ class Compiler:
         pos = len(self.code)
         self.code += b
         return pos
+
+    def new_label(self, prefix: str) -> str:
+        self.serial += 1
+        return f"{prefix}_{self.serial}"
+
+    def emit_jcc(self, cc: bytes, label: str) -> None:
+        pos = self.emit(b"\x0f" + cc + b"\x00\x00\x00\x00")
+        self.jumps.append((pos + 2, label, 6))
+
+    def emit_jmp(self, label: str) -> None:
+        pos = self.emit(b"\xe9\x00\x00\x00\x00")
+        self.jumps.append((pos + 1, label, 5))
 
     def prologue(self, m: FnMeta) -> None:
         self.emit(b"\x55")                       # push rbp
@@ -87,6 +101,22 @@ class Compiler:
         pos = self.emit(b"\xe8\x00\x00\x00\x00")
         self.fixups.append((pos + 1, name))
 
+    def eval_cond(self, e: ast.Expr, m: FnMeta) -> None:
+        if isinstance(e, ast.Binary) and e.op in ("==", "!=", "<", ">"):
+            self.eval_to_rax(e.left, m)
+            self.emit(b"\x50")                       # push rax
+            self.eval_to_rax(e.right, m)
+            self.emit(b"\x59")                       # pop rcx
+            self.emit(b"\x48\x39\xc1")             # cmp rcx, rax
+            cc = {"==": b"\x94", "!=": b"\x95", "<": b"\x9c", ">": b"\x9f"}[e.op]
+            self.emit(b"\x0f" + cc + b"\xc0")       # setcc al
+            self.emit(b"\x0f\xb6\xc0")             # movzx eax, al
+            return
+        self.eval_to_rax(e, m)
+        self.emit(b"\x48\x83\xf8\x00")           # cmp rax, 0
+        self.emit(b"\x0f\x95\xc0")                 # setne al
+        self.emit(b"\x0f\xb6\xc0")                 # movzx eax, al
+
     def eval_to_rax(self, e: ast.Expr, m: FnMeta) -> None:
         if isinstance(e, ast.Lit) and isinstance(e.value, int):
             self.emit(b"\xb8" + struct.pack("<I", int(e.value) & 0xFFFFFFFF)); return
@@ -94,9 +124,22 @@ class Compiler:
             if e.name not in m.slots:
                 raise CodegenError("E_STEP4_NAME", f"未定义变量 `{e.name}`", e.line, e.col)
             self.local_load(m.slots[e.name]); return
+        if isinstance(e, ast.Binary) and e.op in ("+", "-"):
+            self.eval_to_rax(e.left, m)
+            self.emit(b"\x50")                       # push rax
+            self.eval_to_rax(e.right, m)
+            self.emit(b"\x59")                       # pop rcx
+            if e.op == "+":
+                self.emit(b"\x48\x01\xc8")         # add rax, rcx
+            else:
+                self.emit(b"\x48\x29\xc1")         # sub rcx, rax
+                self.emit(b"\x48\x89\xc8")         # mov rax, rcx
+            return
+        if isinstance(e, ast.Unary) and e.op == "-":
+            self.eval_to_rax(e.expr, m); self.emit(b"\x48\xf7\xd8"); return
         if isinstance(e, ast.Call) and isinstance(e.fn, ast.Var):
             self.emit_call(e.fn.name, e.args, m); return
-        raise CodegenError("E_STEP4_EXPR", "Step 4 只支持字面量/变量/函数调用", getattr(e, "line", 0))
+        raise CodegenError("E_STEP5_EXPR", "Step 5 只支持字面量/变量/调用/+-", getattr(e, "line", 0))
 
     def eval_to_reg(self, e: ast.Expr, m: FnMeta, reg: str) -> None:
         if isinstance(e, ast.Lit) and isinstance(e.value, int):
@@ -118,14 +161,41 @@ class Compiler:
             self.eval_to_reg(arg, m, reg)
         self.call(name)
 
-    def compile_fn(self, fn: ast.FnDecl) -> None:
-        m = self.meta[fn.name]
-        self.labels[fn.name] = len(self.code)
-        self.prologue(m)
-        for st in fn.body.stmts if isinstance(fn.body, ast.Block) else []:
+    def compile_cond(self, e: ast.Expr, m: FnMeta, then_lbl: str) -> None:
+        if isinstance(e, ast.Binary) and e.op in ("==", "!=", "<", ">"):
+            self.eval_to_rax(e.left, m)
+            self.emit(b"\x50")
+            self.eval_to_rax(e.right, m)
+            self.emit(b"\x59")
+            self.emit(b"\x48\x39\xc1")             # cmp rcx, rax
+            cc = {"==": b"\x84", "!=": b"\x85", "<": b"\x8c", ">": b"\x8f"}[e.op]
+            self.emit_jcc(cc, then_lbl)
+            return
+        self.eval_to_rax(e, m)
+        self.emit(b"\x48\x83\xf8\x00")             # cmp rax,0
+        self.emit_jcc(b"\x85", then_lbl)             # jne then
+
+    def compile_if(self, e: ast.IfExpr, m: FnMeta) -> None:
+        then_lbl = self.new_label("then")
+        else_lbl = self.new_label("else")
+        end_lbl = self.new_label("endif")
+        self.compile_cond(e.cond, m, then_lbl)
+        self.emit_jmp(else_lbl)
+        self.labels[then_lbl] = len(self.code)
+        self.compile_stmts(e.then_block.stmts if isinstance(e.then_block, ast.Block) else [], m)
+        self.emit_jmp(end_lbl)
+        self.labels[else_lbl] = len(self.code)
+        if isinstance(e.else_, ast.Block):
+            self.compile_stmts(e.else_.stmts, m)
+        elif isinstance(e.else_, ast.IfExpr):
+            self.compile_if(e.else_, m)
+        self.labels[end_lbl] = len(self.code)
+
+    def compile_stmts(self, stmts: list[ast.Stmt], m: FnMeta) -> None:
+        for st in stmts:
             if isinstance(st, ast.LetStmt):
                 if st.value is None:
-                    raise CodegenError("E_STEP4_LET", "Step 4 let 必须有初值", st.line, st.col)
+                    raise CodegenError("E_STEP4_LET", "let 必须有初值", st.line, st.col)
                 self.eval_to_rax(st.value, m)
                 self.local_store(m.slots[st.name])
             elif isinstance(st, ast.ReturnStmt):
@@ -135,19 +205,26 @@ class Compiler:
                     self.emit(b"\xb8\x00\x00\x00\x00")
                 self.epilogue()
                 return
+            elif isinstance(st, ast.ExprStmt) and isinstance(st.expr, ast.IfExpr):
+                self.compile_if(st.expr, m)
             elif isinstance(st, ast.ExprStmt) and isinstance(st.expr, ast.Call) and isinstance(st.expr.fn, ast.Var):
                 if st.expr.fn.name == "sys_exit":
                     if len(st.expr.args) != 1:
                         raise CodegenError("E_STEP4_ARGS", "sys_exit(code)")
-                    self.eval_to_rax(st.expr.args[0], m)   # rax
-                    self.emit(b"\x48\x89\xc7")             # mov rdi, rax
-                    self.emit(b"\xb8\x3c\x00\x00\x00")     # mov eax, 60
-                    self.emit(b"\x0f\x05")                 # syscall
+                    self.eval_to_rax(st.expr.args[0], m)
+                    self.emit(b"\x48\x89\xc7")
+                    self.emit(b"\xb8\x3c\x00\x00\x00")
+                    self.emit(b"\x0f\x05")
                     return
                 self.emit_call(st.expr.fn.name, st.expr.args, m)
             else:
-                raise CodegenError("E_STEP4_STMT", "Step 4 不支持的语句", getattr(st, "line", 0))
-        # 隐式 0 返回
+                raise CodegenError("E_STEP5_STMT", "Step 5 不支持的语句", getattr(st, "line", 0))
+
+    def compile_fn(self, fn: ast.FnDecl) -> None:
+        m = self.meta[fn.name]
+        self.labels[fn.name] = len(self.code)
+        self.prologue(m)
+        self.compile_stmts(fn.body.stmts if isinstance(fn.body, ast.Block) else [], m)
         self.emit(b"\xb8\x00\x00\x00\x00")
         self.epilogue()
 
@@ -165,6 +242,11 @@ class Compiler:
             if name not in self.labels:
                 raise CodegenError("E_STEP4_LABEL", f"未解析函数 `{name}`")
             rel = self.labels[name] - (at + 4)
+            self.code[at:at + 4] = struct.pack("<i", rel)
+        for at, label, op_len in self.jumps:
+            if label not in self.labels:
+                raise CodegenError("E_STEP5_LABEL", f"未解析标签 `{label}`")
+            rel = self.labels[label] - (at + 4)
             self.code[at:at + 4] = struct.pack("<i", rel)
         return bytes(self.code)
 
