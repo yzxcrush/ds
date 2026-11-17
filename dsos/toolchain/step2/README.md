@@ -98,6 +98,7 @@ python3 -m unittest dsos/toolchain/step2/test_step2.py -v
 - `syscall`
 - `xor edi, edi`
 - `ret`
+- `jmp rel8/rel32`（编码器已支持，Step 5 分支使用）
 
 后续 Step 4 会加 `push/mov rbp,rsp/sub rsp/pop rbp`，Step 5 加 `add/sub/cmp/je/jne/jl/jg`。
 

@@ -27,6 +27,10 @@ class TestStep2(unittest.TestCase):
         self.assertTrue(code.endswith(b"DsOS booted.\n"))
         self.assertEqual(len(code), 47)
 
+    def test_jmp_encoding(self):
+        enc = x86.Encoder(); enc.jmp_rel32(0); self.assertEqual(bytes(enc.code), b"\xe9\x00\x00\x00\x00")
+        enc = x86.Encoder(); enc.jmp_rel8(-2); self.assertEqual(bytes(enc.code), b"\xeb\xfe")
+
     def test_elf_header(self):
         code = x86.compile_source(SRC, "hello.ds")
         elf = x86.elf64(code)

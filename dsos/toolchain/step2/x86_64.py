@@ -53,6 +53,12 @@ class Encoder:
     def syscall(self) -> None:
         self.code += b"\x0f\x05"
 
+    def jmp_rel32(self, delta: int) -> None:
+        self.code += b"\xe9" + struct.pack("<i", delta)
+
+    def jmp_rel8(self, delta: int) -> None:
+        self.code += b"\xeb" + bytes([delta & 0xFF])
+
     def ret(self) -> None:
         self.code += b"\xc3"
 
