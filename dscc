@@ -1,4 +1,10 @@
 #!/bin/sh
-# dscc — Ds v0.1 编译器风格终端驱动（Python 参考实现，跨平台 shell 启动器）
+# dscc — Ds v0.1 编译器风格终端驱动
+# 基础解释执行走 dsv01；DsOS Phase 1 的 `--emit bin|elf` 走直接机器码后端。
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+case " $* " in
+  *" --emit bin "*|*" --emit elf "*|*" --emit=bin "*|*" --emit=elf "*)
+    PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "${PYTHON:-python3}" \
+      "$here/dsos/toolchain/step2/dscc_x86.py" "$@" ;;
+esac
 PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "${PYTHON:-python3}" -m dsv01.cli "$@"
