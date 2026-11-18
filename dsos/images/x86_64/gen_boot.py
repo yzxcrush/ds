@@ -11,19 +11,41 @@ import struct
 
 HERE = pathlib.Path(__file__).resolve().parent
 STAGE2_ADDR = 0x8000
-GDT_OFF = 0x200
-GDTR_OFF = 0x228
+GDT_OFF = 0x400
+GDTR_OFF = 0x428
 LOAD_SECTORS = 8
 
 
 class Asm:
     def __init__(self):
         self.b = bytearray()
+        self.labels = {}
+        self.fix = []
 
     def emit(self, data: bytes) -> int:
         p = len(self.b)
         self.b += data
         return p
+
+    def label(self, name: str) -> None:
+        self.labels[name] = len(self.b)
+
+    def rel(self, op: bytes, label: str, n: int = 4) -> int:
+        p = self.emit(op + b"\x00" * n)
+        self.fix.append((p + len(op), label, n))
+        return p
+
+    def jmp(self, label: str) -> None:
+        self.rel(b"\xe9", label)
+
+    def jcc(self, cc: bytes, label: str) -> None:
+        self.rel(b"\x0f" + cc, label)
+
+    def call(self, label: str) -> None:
+        self.rel(b"\xe8", label)
+
+    def lea(self, label: str) -> None:
+        self.rel(b"\x48\x8d\x35", label)
 
     def u16(self, v: int) -> bytes:
         return struct.pack("<H", v & 0xFFFF)
@@ -47,6 +69,7 @@ def stage2() -> bytes:
     a.emit(b"\xe6\x92")                      # out 0x92,al
     # lgdt [0x8120]
     a.emit(b"\x0f\x01\x16" + a.u16(STAGE2_ADDR + GDTR_OFF))
+    # 16-bit mode 下 lgdt 用 16 位地址（0x8428 可表示），不需要 disp32/patch
     # enter protected mode
     a.emit(b"\x0f\x20\xc0")                  # mov eax,cr0
     a.emit(b"\x0c\x01")                      # or al,1
@@ -98,15 +121,41 @@ def stage2() -> bytes:
     a.emit(b"\x8e\xc0")                      # mov es,ax
     a.emit(b"\x8e\xd0")                      # mov ss,ax
     a.emit(b"\x48\xbc" + struct.pack("<Q", 0x70000))  # mov rsp,0x70000
-    # serial output helper inline
-    msg = b"DsOS booted.\r\n"
-    for ch in msg:
-        a.emit(b"\x66\xba\xf8\x03")          # mov dx,0x3f8
-        a.emit(b"\xb0" + bytes([ch]))        # mov al,ch
-        a.emit(b"\xee")                      # out dx,al
-    a.emit(b"\xfa")                          # cli
-    a.emit(b"\xf4")                          # hlt
-    a.emit(b"\xeb\xfd")                      # jmp $
+    a.call("uart_init")
+    a.lea("s_alive"); a.call("puts")
+    a.emit(b"\x45\x31\xe4")                  # xor r12d,r12d
+    a.emit(b"\x0f\x31\x48\xc1\xe2\x20\x48\x09\xd0\x49\x89\xc7")
+    a.label("tick_loop")
+    a.emit(b"\x0f\x31\x48\xc1\xe2\x20\x48\x09\xd0")
+    a.emit(b"\x4c\x29\xf8")                  # sub rax,r15
+    a.emit(b"\x48\x3d" + a.u32(1000000000))
+    a.jcc(b"\x82", "tick_loop")               # jb
+    a.emit(b"\x0f\x31\x48\xc1\xe2\x20\x48\x09\xd0\x49\x89\xc7")
+    a.emit(b"\x49\xff\xc4")                  # inc r12
+    a.lea("s_tick"); a.call("puts")
+    a.emit(b"\x44\x89\xe7")                  # mov edi,r12d
+    a.call("print_u32")
+    a.lea("s_nl"); a.call("puts")
+    a.jmp("tick_loop")
+    # --- UART routines (64-bit) ---
+    a.label("uart_init")
+    for port, val in ((0x3f9,0),(0x3fb,0x80),(0x3f8,1),(0x3f9,0),(0x3fb,3),(0x3fa,0xC7)):
+        a.emit(b"\x66\xba" + a.u16(port) + b"\xb0" + bytes([val]) + b"\xee")
+    a.emit(b"\xc3")
+    a.label("putc")
+    a.emit(b"\x50\x66\xba\xfd\x03")
+    a.label("putc_wait"); a.emit(b"\xec\xa8\x20"); a.jcc(b"\x84", "putc_wait")
+    a.emit(b"\x66\xba\xf8\x03\x58\xee\xc3")
+    a.label("puts")
+    a.label("puts_loop"); a.emit(b"\xac\x84\xc0"); a.jcc(b"\x84", "puts_done")
+    a.call("putc"); a.jmp("puts_loop"); a.label("puts_done"); a.emit(b"\xc3")
+    a.label("print_u32")
+    a.emit(b"\x89\xf8\x31\xd2\xb9\x0a\x00\x00\x00\x45\x31\xc9")
+    a.label("pu_loop"); a.emit(b"\x31\xd2\xf7\xf1\x52\x49\xff\xc1\x85\xc0"); a.jcc(b"\x85", "pu_loop")
+    a.label("pu_pop"); a.emit(b"\x5a\x80\xc2\x30\x88\xd0"); a.call("putc")
+    a.emit(b"\x49\xff\xc9"); a.jcc(b"\x85", "pu_pop"); a.emit(b"\xc3")
+    for name, text in (("s_alive", b"DsOS alive\r\n"), ("s_tick", b"tick: "), ("s_nl", b"\r\n")):
+        a.label(name); a.emit(text + b"\x00")
     # GDT at GDT_OFF
     assert len(a.b) <= GDT_OFF, len(a.b)
     a.b += b"\x00" * (GDT_OFF - len(a.b))
@@ -121,6 +170,9 @@ def stage2() -> bytes:
         a.b += struct.pack("<Q", g)
     assert len(a.b) == GDTR_OFF
     a.b += struct.pack("<HI", 5 * 8 - 1, STAGE2_ADDR + GDT_OFF)
+    for at, label, n in a.fix:
+        target = a.labels[label]
+        a.b[at:at + n] = struct.pack("<i" if n == 4 else "<h", target - (at + n))
     return bytes(a.b)
 
 
