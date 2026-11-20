@@ -30,6 +30,7 @@ def run_example(path: Path) -> str:
 
 
 def build() -> str:
+    overview = read("ai/OVERVIEW.md")
     card = read("ai/LANGUAGE_CARD.md")
     concise = read("spec/DS-CONCISE.md")
     flow = read("spec/DS-FLOW.md")
@@ -91,6 +92,10 @@ def build() -> str:
         "## 2h. DSOSS 标准（DsOS Standard Specification）",
         "",
         dsoss,
+        "",
+        "## 2c0. 完整介绍（AI 学习总览）",
+        "",
+        overview,
         "",
         "## 2c. Language Card",
         "",

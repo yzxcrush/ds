@@ -104,6 +104,7 @@ node ../ds-android/tests/node_test.js   # 若本地有 Android 仓库
 
 ## AI 学习包
 
+- 完整介绍：[ai/OVERVIEW.md](ai/OVERVIEW.md)
 - 一页纸：[ai/LANGUAGE_CARD.md](ai/LANGUAGE_CARD.md)
 - 可直接复制：[ai/DS_AI_CARD.txt](ai/DS_AI_CARD.txt)
 - 全量上下文：[ai/llms-full.txt](ai/llms-full.txt) · [llms.txt](llms.txt)
