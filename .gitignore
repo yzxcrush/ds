@@ -25,3 +25,4 @@ build/
 .venv/
 .venv-check/
 .tmp/
+exports/
